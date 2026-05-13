@@ -2542,7 +2542,7 @@
 <!-- Always-visible sound toggle (top-center) -->
 <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Geluid dempen of aanzetten">
   <span class="wave" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-  <span class="lbl" id="sound-toggle-lbl">DAMP</span>
+  <span class="lbl" id="sound-toggle-lbl">DEMP</span>
 </button>
 
 <div class="scene-indicator">// GALAXY ▸ <span class="accent">MEDIA HUB</span></div>
@@ -2915,7 +2915,7 @@ const GeeksAudio = (() => {
     const lbl = document.getElementById('sound-toggle-lbl');
     if (!btn || !lbl) return;
     btn.classList.toggle('muted', muted);
-    lbl.textContent = muted ? 'GELUID AAN' : 'DAMP';
+    lbl.textContent = muted ? 'GELUID AAN' : 'DEMP';
     btn.setAttribute('aria-pressed', String(muted));
   }
 
