@@ -1,0 +1,3753 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>GEEKS // UNIVERSE NAVIGATOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-void: #050010;
+    --bg-deep: #0a0518;
+    --purple: #7B2CFF;
+    --purple-hot: #9d4fff;
+    --orange: #ff9b1f;
+    --magenta: #ff2bd6;
+    --cyan: #25e0ff;
+    --green: #6efb89;
+    --cream: #f4ecd8;
+    --red: #ff4060;
+    --gold: #ffd24a;
+    --ink: #0a0518;
+    --f-display: 'Bowlby One', system-ui, sans-serif;
+    --f-body: 'Space Grotesk', system-ui, sans-serif;
+    --f-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --f-pixel: 'VT323', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    width: 100%;
+    background: var(--bg-void);
+    color: var(--cream);
+    font-family: var(--f-body);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  body {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%2325e0ff' stroke-width='1.5'%3E%3Ccircle cx='16' cy='16' r='10'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%2325e0ff'/%3E%3Cpath d='M16 2v6M16 24v6M2 16h6M24 16h6'/%3E%3C/g%3E%3C/svg%3E") 16 16, crosshair;
+  }
+  body.grabbing { cursor: grabbing; }
+  body.in-planet { cursor: default; }
+
+  /* ====== UNIVERSE ROOT ====== */
+  .universe {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(123,44,255,0.15), transparent 60%),
+      radial-gradient(ellipse at 70% 80%, rgba(255,43,214,0.1), transparent 60%),
+      var(--bg-void);
+  }
+
+  /* ====== STARFIELD CANVAS ====== */
+  #starfield {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ====== GALAXY STAGE (pan + zoom container) ====== */
+  .galaxy-viewport {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+  }
+  .galaxy-stage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  /* Orbits */
+  .orbit {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px dashed rgba(244, 236, 216, 0.07);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .orbit::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    box-shadow: inset 0 0 80px rgba(123, 44, 255, 0.04);
+  }
+
+  /* GEEKS Core (central sun) */
+  .geeks-core {
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 40% 35%, #fff7e0 0%, var(--orange) 18%, var(--magenta) 45%, var(--purple) 75%, transparent 100%);
+    box-shadow:
+      0 0 80px rgba(255, 155, 31, 0.5),
+      0 0 160px rgba(123, 44, 255, 0.4),
+      inset 0 0 60px rgba(255, 255, 255, 0.3);
+    z-index: 10;
+    cursor: pointer;
+    animation: core-pulse 5s ease-in-out infinite;
+  }
+  .geeks-core::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 155, 31, 0.3);
+    animation: ring-pulse 3s ease-in-out infinite;
+  }
+  .geeks-core::after {
+    content: "";
+    position: absolute;
+    inset: -24px;
+    border-radius: 50%;
+    border: 1px dashed rgba(255, 43, 214, 0.2);
+    animation: spin 60s linear infinite;
+  }
+  .geeks-core-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--f-display);
+    font-size: 38px;
+    color: var(--ink);
+    text-align: center;
+    pointer-events: none;
+    z-index: 11;
+    letter-spacing: -0.02em;
+  }
+  .geeks-core-label .sub {
+    display: block;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    margin-top: 6px;
+    opacity: 0.75;
+    font-weight: 700;
+  }
+
+  @keyframes core-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.15); }
+  }
+  @keyframes ring-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Planets */
+  .planet {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 5;
+  }
+  .planet-orb-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .planet-orb {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    background: var(--planet-bg);
+    box-shadow:
+      inset -12px -12px 28px rgba(0, 0, 0, 0.55),
+      inset 8px 8px 24px rgba(255, 255, 255, 0.2),
+      0 0 40px var(--planet-glow),
+      0 0 80px var(--planet-glow);
+    transition: filter 0.25s, transform 0.25s;
+    overflow: hidden;
+  }
+  .planet-orb::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 28% 26%, rgba(255, 255, 255, 0.5), transparent 45%);
+    pointer-events: none;
+  }
+  .planet-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 180%;
+    height: 30%;
+    transform: translate(-50%, -50%) rotateX(72deg);
+    border-radius: 50%;
+    border: 2px solid var(--planet-glow);
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .planet-ring.inner {
+    width: 150%;
+    height: 22%;
+    opacity: 0.6;
+  }
+
+  /* Reticle when hovered */
+  .planet-reticle {
+    position: absolute;
+    inset: -30%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .planet:hover .planet-reticle { opacity: 1; }
+  .planet:hover .planet-orb { filter: brightness(1.3); }
+
+  .planet-reticle::before,
+  .planet-reticle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .planet-reticle::before {
+    border: 1px solid var(--cyan);
+    border-radius: 50%;
+    animation: reticle-spin 8s linear infinite;
+    border-style: dashed;
+  }
+  .planet-reticle .bracket {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--cyan);
+  }
+  .planet-reticle .bracket.tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .planet-reticle .bracket.tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .planet-reticle .bracket.bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .planet-reticle .bracket.br { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+  @keyframes reticle-spin { to { transform: rotate(360deg); } }
+
+  /* Label */
+  .planet-label {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 20px);
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .planet-label .name {
+    font-family: var(--f-display);
+    font-size: 14px;
+    color: var(--cream);
+    letter-spacing: 0.05em;
+    text-shadow:
+      0 0 8px var(--bg-void),
+      0 2px 0 rgba(0,0,0,0.6);
+  }
+  .planet-label .tier {
+    display: block;
+    margin-top: 4px;
+    font-family: var(--f-mono);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--planet-glow);
+    font-weight: 700;
+  }
+  .planet:hover .planet-label .name { color: var(--cyan); }
+
+  /* Orbital animation - planets revolve slowly around core */
+  .orbit-track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    animation: orbit-spin var(--orbit-duration, 90s) linear infinite;
+    animation-delay: var(--orbit-delay, 0s);
+    will-change: transform;
+  }
+  @keyframes orbit-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .orbit-track .planet {
+    /* Counter-rotate so planets stay upright */
+    animation: counter-spin var(--orbit-duration, 90s) linear infinite;
+    animation-delay: var(--orbit-delay, 0s);
+  }
+  @keyframes counter-spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(-360deg); }
+  }
+
+  /* When something is selected, dim the rest */
+  .universe.targeting .planet:not(.targeted) .planet-orb { filter: brightness(0.5); }
+
+  /* ====== HUD ====== */
+  .hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+  }
+  .hud > * { pointer-events: auto; }
+
+  /* Top HUD */
+  .hud-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 20px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+  }
+  .hud-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--f-display);
+    font-size: 22px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+  }
+  .hud-brand .star {
+    width: 12px;
+    height: 12px;
+    background: var(--orange);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--orange);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+  .hud-brand .dot { color: var(--orange); }
+  .hud-brand .sub {
+    margin-left: 14px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--cyan);
+    font-weight: 700;
+    align-self: center;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .hud-status {
+    display: flex;
+    gap: 18px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--cream);
+  }
+  .hud-status .item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(10, 5, 24, 0.6);
+    padding: 8px 14px;
+    border: 1px solid rgba(244, 236, 216, 0.15);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+  }
+  .hud-status .item .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+  .hud-status .item.warn .dot { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+
+  /* Left side: planet list / fast travel */
+  .hud-left {
+    position: absolute;
+    top: 100px;
+    left: 32px;
+    width: 240px;
+    background: rgba(10, 5, 24, 0.65);
+    border: 1px solid rgba(244, 236, 216, 0.12);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    padding: 18px;
+  }
+  .btn-intro-reopen {
+    width: 100%;
+    background: transparent;
+    border: 1px dashed rgba(255, 155, 31, 0.4);
+    color: var(--orange);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-intro-reopen:hover {
+    background: rgba(255, 155, 31, 0.12);
+    border-color: var(--orange);
+    border-style: solid;
+  }
+  .btn-intro-reopen .ic { font-size: 13px; }
+  .hud-left .title {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hud-left .title::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: var(--cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  .hud-left .nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: var(--cream);
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: all 0.2s;
+  }
+  .nav-item:hover {
+    background: rgba(123, 44, 255, 0.15);
+    border-color: rgba(123, 44, 255, 0.4);
+    padding-left: 16px;
+  }
+  .nav-item.active {
+    background: rgba(255, 155, 31, 0.15);
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .nav-section-label {
+    font-family: var(--f-mono);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: rgba(244, 236, 216, 0.4);
+    margin: 10px 0 4px 4px;
+    text-transform: uppercase;
+  }
+  .nav-section-label:first-child { margin-top: 0; }
+  .nav-item .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--nav-color);
+    box-shadow: 0 0 6px var(--nav-color);
+  }
+  .nav-item .arrow {
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .nav-item:hover .arrow,
+  .nav-item.active .arrow { opacity: 1; }
+
+  /* Right side: controls / minimap */
+  .hud-right {
+    position: absolute;
+    top: 100px;
+    right: 32px;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .minimap {
+    background: rgba(10, 5, 24, 0.7);
+    border: 1px solid rgba(244, 236, 216, 0.12);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    padding: 14px;
+  }
+  .minimap .title {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    margin-bottom: 10px;
+  }
+  .minimap-canvas {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    background:
+      radial-gradient(circle at center, rgba(123, 44, 255, 0.2), transparent 60%),
+      rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(244, 236, 216, 0.1);
+    border-radius: 50%;
+    overflow: hidden;
+  }
+  .minimap-canvas::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(37, 224, 255, 0.08) 1px, transparent 1px) 0 0 / 20px 20px,
+      linear-gradient(90deg, rgba(37, 224, 255, 0.08) 1px, transparent 1px) 0 0 / 20px 20px;
+  }
+  .minimap-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dot-color);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px var(--dot-color);
+  }
+  .minimap-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--orange);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px var(--orange);
+  }
+  .minimap-viewport {
+    position: absolute;
+    width: 30%;
+    height: 30%;
+    border: 1px solid var(--cyan);
+    background: rgba(37, 224, 255, 0.08);
+    pointer-events: none;
+    transition: all 0.15s ease-out;
+  }
+
+  .controls-card {
+    background: rgba(10, 5, 24, 0.7);
+    border: 1px solid rgba(244, 236, 216, 0.12);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    padding: 14px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--cream);
+  }
+  .controls-card .title {
+    color: var(--cyan);
+    letter-spacing: 0.3em;
+    margin-bottom: 10px;
+  }
+  .controls-card .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    opacity: 0.85;
+  }
+  .controls-card .key {
+    background: rgba(244, 236, 216, 0.08);
+    border: 1px solid rgba(244, 236, 216, 0.2);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-weight: 700;
+  }
+
+  /* Bottom HUD: only coords now (target-info moved to center) */
+  .hud-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 32px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    gap: 24px;
+    pointer-events: none;
+  }
+  .hud-bottom > * { pointer-events: auto; }
+
+  /* Target info — now a centered floating dialog */
+  .target-info {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(20px);
+    background: rgba(10, 5, 24, 0.92);
+    border: 1px solid var(--cyan);
+    border-radius: 18px;
+    backdrop-filter: blur(16px);
+    padding: 26px 32px;
+    min-width: 380px;
+    max-width: 460px;
+    font-family: var(--f-mono);
+    z-index: 50;
+    box-shadow: 0 0 0 1px rgba(37, 224, 255, 0.15), 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 80px rgba(37, 224, 255, 0.15);
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    pointer-events: none;
+  }
+  .target-info.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0);
+    pointer-events: auto;
+  }
+  /* hide target-info when overlay views are open */
+  body.in-planet .target-info {
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Corner brackets on target info */
+  .target-info::before {
+    content: "";
+    position: absolute;
+    top: 12px; left: 12px;
+    width: 20px; height: 20px;
+    border-top: 2px solid var(--cyan);
+    border-left: 2px solid var(--cyan);
+    border-top-left-radius: 10px;
+  }
+  .target-info::after {
+    content: "";
+    position: absolute;
+    bottom: 12px; right: 12px;
+    width: 20px; height: 20px;
+    border-bottom: 2px solid var(--cyan);
+    border-right: 2px solid var(--cyan);
+    border-bottom-right-radius: 10px;
+  }
+  .target-info .label {
+    font-size: 10px;
+    letter-spacing: 0.35em;
+    color: var(--cyan);
+    margin-bottom: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .target-info .label::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background: var(--cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--cyan);
+    animation: target-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes target-pulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
+  }
+  .target-info .name {
+    font-family: var(--f-display);
+    font-size: 32px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+    line-height: 1;
+  }
+  .target-info .desc {
+    font-size: 12px;
+    color: rgba(244, 236, 216, 0.75);
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+    margin-bottom: 22px;
+    font-family: var(--f-body);
+  }
+  .target-info .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+  }
+  .target-info .btn-warp {
+    flex: 1;
+    justify-content: center;
+    padding: 12px 18px;
+  }
+  .btn-warp {
+    background: var(--orange);
+    color: var(--ink);
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-warp:hover {
+    background: var(--magenta);
+    color: var(--cream);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 43, 214, 0.4);
+  }
+  .btn-warp .icon { font-size: 14px; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--cream);
+    border: 1px solid rgba(244, 236, 216, 0.3);
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-ghost:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  .coords-display {
+    background: rgba(10, 5, 24, 0.6);
+    border: 1px solid rgba(244, 236, 216, 0.12);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    padding: 10px 14px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--cream);
+    text-align: right;
+  }
+  .coords-display .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 2px 0;
+  }
+  .coords-display .lbl {
+    color: var(--cyan);
+    font-weight: 700;
+  }
+  .coords-display .val {
+    color: var(--cream);
+    min-width: 70px;
+    text-align: right;
+  }
+
+  /* ====== PLANET DETAIL VIEW (when warped in) ====== */
+  .planet-view {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(5, 0, 16, 0.85);
+    backdrop-filter: blur(20px);
+    display: none;
+    opacity: 0;
+    transition: opacity 0.4s;
+    overflow-y: auto;
+  }
+  .planet-view.open {
+    display: block;
+    opacity: 1;
+  }
+  .planet-view.opening {
+    animation: warp-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes warp-in {
+    0% { opacity: 0; transform: scale(0.92); filter: blur(10px); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  }
+
+  .planet-view-inner {
+    min-height: 100%;
+    padding: 80px 60px 100px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .pv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 50px;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .pv-breadcrumb {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pv-breadcrumb .arrow { color: var(--orange); }
+
+  .btn-disconnect {
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.25em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-disconnect:hover {
+    background: var(--red);
+    color: var(--cream);
+  }
+  .btn-disconnect .icon { font-size: 14px; }
+
+  .pv-title-block {
+    margin-bottom: 50px;
+  }
+  .pv-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--orange);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .pv-eyebrow::before {
+    content: "";
+    width: 36px;
+    height: 1px;
+    background: var(--orange);
+  }
+  .pv-title {
+    font-family: var(--f-display);
+    font-size: clamp(56px, 10vw, 140px);
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    color: var(--cream);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .pv-title .accent { color: var(--planet-color, var(--orange)); }
+  .pv-lead {
+    font-family: var(--f-body);
+    font-size: 18px;
+    line-height: 1.5;
+    color: rgba(244, 236, 216, 0.85);
+    max-width: 700px;
+  }
+
+  /* Planet view content grids */
+  .pv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 900px) {
+    .pv-grid { grid-template-columns: 1fr; }
+  }
+  .pv-card {
+    background:
+      linear-gradient(135deg, rgba(123, 44, 255, 0.08), rgba(10, 5, 24, 0.6));
+    border: 1px solid rgba(244, 236, 216, 0.12);
+    border-radius: 18px;
+    padding: 32px;
+    position: relative;
+  }
+  .pv-card::before {
+    content: "";
+    position: absolute;
+    top: 14px; left: 14px;
+    width: 26px; height: 26px;
+    border-top: 2px solid var(--orange);
+    border-left: 2px solid var(--orange);
+    border-top-left-radius: 12px;
+  }
+  .pv-card::after {
+    content: "";
+    position: absolute;
+    bottom: 14px; right: 14px;
+    width: 26px; height: 26px;
+    border-bottom: 2px solid var(--orange);
+    border-right: 2px solid var(--orange);
+    border-bottom-right-radius: 12px;
+  }
+  .pv-card .card-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    margin-bottom: 14px;
+  }
+  .pv-card h3 {
+    font-family: var(--f-display);
+    font-size: 28px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .pv-card p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: rgba(244, 236, 216, 0.8);
+    margin-bottom: 10px;
+  }
+  .pv-card .quote {
+    border-left: 3px solid var(--planet-color, var(--orange));
+    padding: 4px 16px;
+    margin-top: 16px;
+    font-style: italic;
+    color: var(--cream);
+  }
+
+  /* Host planet hero — uses JPGs with black bg, container does the framing */
+  .host-hero {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 40px;
+    align-items: center;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 900px) {
+    .host-hero { grid-template-columns: 1fr; }
+  }
+  .host-portrait {
+    position: relative;
+    aspect-ratio: 3/4;
+    background: #000;
+    border: 1px solid var(--planet-color);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 0 50px var(--planet-color), inset 0 0 80px rgba(0, 0, 0, 0.5);
+  }
+  /* Subtle hex grid + bottom glow */
+  .host-portrait::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 75%, var(--planet-color) 0%, transparent 55%),
+      repeating-linear-gradient(0deg, transparent 0, transparent 40px, rgba(244, 236, 216, 0.04) 40px, rgba(244, 236, 216, 0.04) 41px),
+      repeating-linear-gradient(90deg, transparent 0, transparent 40px, rgba(244, 236, 216, 0.04) 40px, rgba(244, 236, 216, 0.04) 41px);
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* corner brackets */
+  .host-portrait .corner {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--planet-color);
+    z-index: 3;
+    opacity: 0.8;
+  }
+  .host-portrait .corner.tl { top: 10px; left: 10px; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+  .host-portrait .corner.tr { top: 10px; right: 10px; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+  .host-portrait .corner.bl { bottom: 10px; left: 10px; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+  .host-portrait .corner.br { bottom: 10px; right: 10px; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+
+  .host-portrait img {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    width: auto;
+    max-width: none;
+    object-fit: contain;
+    object-position: bottom center;
+    z-index: 1;
+    display: block;
+  }
+  .host-portrait .scan {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 0%, transparent 49%, var(--planet-color) 50%, transparent 51%, transparent 100%);
+    opacity: 0.4;
+    animation: scan 4s linear infinite;
+    pointer-events: none;
+    z-index: 2;
+  }
+  @keyframes scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+  .host-portrait .badges {
+    position: absolute;
+    inset: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .host-badge {
+    background: rgba(5, 0, 16, 0.85);
+    border: 1px solid var(--planet-color);
+    color: var(--planet-color);
+    padding: 6px 12px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    font-weight: 800;
+    display: inline-block;
+    align-self: flex-start;
+    backdrop-filter: blur(4px);
+    border-radius: 4px;
+  }
+  .host-badge.right { align-self: flex-end; }
+
+  /* ====== INHABITANTS picker ====== */
+  .host-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 900px) {
+    .host-pick-grid { grid-template-columns: 1fr; gap: 16px; }
+  }
+  .host-pick {
+    position: relative;
+    background: #000;
+    border: 1px solid rgba(244, 236, 216, 0.18);
+    border-radius: 18px;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    aspect-ratio: 3/4;
+    text-align: left;
+    color: var(--cream);
+    font-family: inherit;
+    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    isolation: isolate;
+  }
+  .host-pick::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background: radial-gradient(ellipse at 50% 75%, var(--host-color) 0%, transparent 55%);
+    opacity: 0.45;
+    z-index: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+  }
+  .host-pick:hover {
+    transform: translateY(-6px);
+    border-color: var(--host-color);
+    box-shadow: 0 16px 40px var(--host-glow), 0 0 0 1px var(--host-color);
+  }
+  .host-pick:hover::before { opacity: 0.75; }
+  .host-pick:hover .host-pick-img {
+    transform: translate(-50%, 0) scale(1.04);
+  }
+  .host-pick-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent 0, transparent 30px, rgba(244, 236, 216, 0.03) 30px, rgba(244, 236, 216, 0.03) 31px);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .host-pick-img {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 0);
+    height: 92%;
+    width: auto;
+    object-fit: contain;
+    object-position: bottom center;
+    z-index: 2;
+    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    pointer-events: none;
+  }
+  .host-pick-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    padding: 20px;
+    background: linear-gradient(180deg, transparent 0%, rgba(5, 0, 16, 0.95) 55%);
+  }
+  .host-pick-class {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--host-color);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .host-pick-name {
+    font-family: var(--f-display);
+    font-size: 32px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .host-pick-tag {
+    font-size: 12px;
+    color: rgba(244, 236, 216, 0.75);
+    margin-bottom: 12px;
+    line-height: 1.3;
+  }
+  .host-pick-cta {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--host-color);
+    font-weight: 800;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .host-pick:hover .host-pick-cta { opacity: 1; }
+
+  .host-data .name-block {
+    margin-bottom: 30px;
+  }
+  .host-data .class {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    letter-spacing: 0.4em;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .host-data .name {
+    font-family: var(--f-display);
+    font-size: clamp(48px, 7vw, 96px);
+    line-height: 0.9;
+    color: var(--cream);
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .host-data .tag {
+    margin-top: 8px;
+    font-family: var(--f-body);
+    font-size: 16px;
+    color: var(--planet-color);
+    font-weight: 600;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 30px;
+  }
+  .stat-row {
+    background: rgba(10, 5, 24, 0.5);
+    border: 1px solid rgba(244, 236, 216, 0.1);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .stat-row .lbl {
+    font-family: var(--f-mono);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: rgba(244, 236, 216, 0.5);
+    margin-bottom: 4px;
+  }
+  .stat-row .val {
+    font-family: var(--f-mono);
+    font-size: 15px;
+    color: var(--cream);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stat-bar {
+    display: inline-block;
+    height: 4px;
+    background: linear-gradient(90deg, var(--planet-color), var(--orange));
+    border-radius: 2px;
+  }
+
+  .skill-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .skill-list li {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: rgba(244, 236, 216, 0.85);
+    padding-left: 20px;
+    position: relative;
+  }
+  .skill-list li::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: var(--planet-color);
+    font-weight: 700;
+  }
+  .skill-list li b { color: var(--cream); }
+
+  /* TRIBES special grid */
+  .tribes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 700px) {
+    .tribes-grid { grid-template-columns: 1fr; }
+  }
+  .tribe-card {
+    background:
+      linear-gradient(135deg, var(--tribe-tint, rgba(123, 44, 255, 0.1)), rgba(10, 5, 24, 0.7));
+    border: 1px solid var(--tribe-color);
+    border-radius: 18px;
+    padding: 26px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .tribe-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  }
+  .tribe-card .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .tribe-card .id {
+    font-family: var(--f-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--tribe-color);
+    margin-bottom: 6px;
+  }
+  .tribe-card .name {
+    font-family: var(--f-display);
+    font-size: 22px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+  .tribe-card .age {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--cream);
+    border: 1px solid var(--tribe-color);
+    padding: 4px 8px;
+  }
+  .tribe-card .desc {
+    font-size: 13px;
+    line-height: 1.55;
+    color: rgba(244, 236, 216, 0.8);
+    margin-bottom: 12px;
+  }
+  .tribe-card .quote {
+    border-left: 3px solid var(--tribe-color);
+    padding-left: 12px;
+    font-style: italic;
+    color: var(--cream);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* Data planet: big stats */
+  .data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+  @media (max-width: 700px) {
+    .data-grid { grid-template-columns: 1fr; }
+  }
+  .data-card {
+    background:
+      linear-gradient(135deg, rgba(255, 210, 74, 0.08), rgba(10, 5, 24, 0.6));
+    border: 1px solid rgba(255, 210, 74, 0.3);
+    border-radius: 18px;
+    padding: 30px;
+  }
+  .data-card .lbl {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    margin-bottom: 12px;
+  }
+  .data-card .num {
+    font-family: var(--f-display);
+    font-size: clamp(48px, 7vw, 80px);
+    line-height: 1;
+    color: var(--cream);
+    margin-bottom: 8px;
+  }
+  .data-card .num .unit {
+    color: var(--gold);
+    font-size: 0.6em;
+  }
+  .data-card .desc {
+    font-size: 13px;
+    color: rgba(244, 236, 216, 0.7);
+    line-height: 1.5;
+  }
+
+  /* Vodcast format breakdown */
+  .format-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .format-list li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    padding: 16px;
+    background: rgba(10, 5, 24, 0.5);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 12px 12px 0;
+  }
+  .format-list .key {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--orange);
+    font-weight: 800;
+    text-transform: uppercase;
+    align-self: center;
+    white-space: nowrap;
+  }
+  .format-list .val {
+    font-size: 14px;
+    color: var(--cream);
+    line-height: 1.5;
+  }
+
+  /* ====== CREW MANIFEST (easter egg via core click) ====== */
+  .crew-manifest {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: rgba(5, 0, 16, 0.92);
+    backdrop-filter: blur(12px);
+    display: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+    overflow: hidden;
+  }
+  .crew-manifest.open {
+    display: flex;
+    opacity: 1;
+    align-items: center;
+    justify-content: center;
+  }
+  .crew-manifest.opening {
+    animation: warp-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .cm-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 60px;
+  }
+  .cm-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(5, 0, 16, 0.4) 0%, rgba(5, 0, 16, 0.5) 50%, rgba(5, 0, 16, 0.9) 100%),
+      url('assets/crew-group.jpg') center 30% / cover no-repeat;
+    z-index: 0;
+  }
+  .cm-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(255, 155, 31, 0.04) 2px, rgba(255, 155, 31, 0.04) 3px);
+    mix-blend-mode: overlay;
+  }
+  .cm-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    max-width: 1100px;
+    width: 100%;
+  }
+  .cm-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    letter-spacing: 0.5em;
+    color: var(--orange);
+    margin-bottom: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .cm-eyebrow::before, .cm-eyebrow::after {
+    content: "";
+    width: 60px;
+    height: 1px;
+    background: var(--orange);
+  }
+  .cm-title {
+    font-family: var(--f-display);
+    font-size: clamp(56px, 9vw, 130px);
+    line-height: 0.95;
+    color: var(--cream);
+    letter-spacing: -0.02em;
+    margin: 8px 0 16px;
+    text-shadow:
+      3px 3px 0 var(--orange),
+      6px 6px 0 var(--purple-hot);
+  }
+  .cm-title .dot { color: var(--orange); }
+  .cm-tagline {
+    font-family: var(--f-body);
+    font-size: 17px;
+    color: var(--cream);
+    max-width: 700px;
+    margin: 0 auto 50px;
+    line-height: 1.55;
+  }
+  .cm-tagline em { color: var(--orange); font-style: normal; font-weight: 700; }
+  .cm-roster {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 40px;
+  }
+  @media (max-width: 700px) {
+    .cm-roster { grid-template-columns: 1fr; }
+    .cm-stage { padding: 30px 16px; }
+  }
+  .cm-card {
+    background: rgba(10, 5, 24, 0.7);
+    border: 1px solid var(--cm-color, var(--cream));
+    border-radius: 16px;
+    padding: 22px;
+    text-align: left;
+    backdrop-filter: blur(8px);
+    position: relative;
+  }
+  .cm-card .id {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--cm-color);
+    margin-bottom: 6px;
+  }
+  .cm-card .name {
+    font-family: var(--f-display);
+    font-size: 36px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .cm-card .class {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--cream);
+    opacity: 0.8;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .cm-card .blurb {
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(244, 236, 216, 0.75);
+  }
+  .cm-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+    border-top: 2px solid var(--cm-color);
+    border-left: 2px solid var(--cm-color);
+  }
+  .cm-card::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 18px;
+    height: 18px;
+    border-bottom: 2px solid var(--cm-color);
+    border-right: 2px solid var(--cm-color);
+  }
+  .cm-close {
+    background: transparent;
+    border: 1px solid var(--cream);
+    border-radius: 8px;
+    color: var(--cream);
+    padding: 14px 32px;
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .cm-close:hover {
+    background: var(--orange);
+    color: var(--ink);
+    border-color: var(--orange);
+  }
+  .cm-close::before { content: "← "; }
+
+  /* ====== END CREW MANIFEST ====== */
+
+  /* === SCENE VISIBILITY === */
+  body[data-scene="main"] .orbit-track[data-scene="media"] { display: none; }
+  body[data-scene="media"] .orbit-track[data-scene="main"] { display: none; }
+  body[data-scene="main"] .minimap-dot[data-scene="media"] { display: none; }
+  body[data-scene="media"] .minimap-dot[data-scene="main"] { display: none; }
+  .orbit-track[data-scene="hidden"] { display: none; }
+  /* Scene transition state */
+  .universe.scene-fading {
+    transition: opacity 0.45s, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+  }
+  .universe.scene-zooming-out {
+    transform: scale(0.4);
+  }
+  .universe.scene-zooming-in {
+    transform: scale(2.5);
+  }
+
+  /* In media scene, center pulses suggesting it's clickable */
+  body[data-scene="media"] .geeks-core {
+    cursor: pointer;
+  }
+  body[data-scene="media"] .geeks-core::after {
+    content: "▸ MISSIE";
+    position: absolute;
+    bottom: -52px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: #6efb89;
+    opacity: 0.85;
+    animation: pulse-label 2s ease-in-out infinite;
+    white-space: nowrap;
+  }
+  @keyframes pulse-label {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* Media-scene exit button (back to main galaxy) */
+  .btn-exit-hub {
+    position: absolute;
+    top: 88px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    background: rgba(10, 5, 24, 0.85);
+    border: 1px solid var(--orange);
+    color: var(--orange);
+    padding: 11px 26px;
+    border-radius: 999px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.25em;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s;
+    display: none;
+  }
+  body[data-scene="media"] .btn-exit-hub { display: inline-block; }
+  .btn-exit-hub:hover {
+    background: var(--orange);
+    color: var(--ink);
+    box-shadow: 0 0 24px rgba(255, 155, 31, 0.5);
+  }
+
+  /* Scene indicator top center */
+  .scene-indicator {
+    position: absolute;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 25;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: rgba(244, 236, 216, 0.5);
+    display: none;
+    pointer-events: none;
+  }
+  body[data-scene="media"] .scene-indicator { display: block; }
+  .scene-indicator .accent { color: var(--orange); }
+  /* Hub hint label below planet (for MEDIA hub) */
+  .hub-hint {
+    position: absolute;
+    top: calc(100% + 76px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.35em;
+    color: var(--orange);
+    background: rgba(10, 5, 24, 0.9);
+    border: 1px solid var(--orange);
+    padding: 6px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+    animation: pulse-label 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .planet:hover .hub-hint {
+    background: var(--orange);
+    color: var(--ink);
+  }
+
+  /* === END SCENE VISIBILITY === */
+
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode: overlay;
+  }
+  .vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background:
+      radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.45) 100%);
+  }
+
+  /* ====== LANDING PAGE ====== */
+  .landing {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background:
+      linear-gradient(180deg, rgba(5, 0, 16, 0.94) 0%, rgba(10, 5, 24, 0.88) 40%, rgba(123, 44, 255, 0.22) 100%),
+      url('assets/crew-group.jpg') center 30% / cover no-repeat;
+    overflow-y: auto;
+    transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .landing::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 25%, rgba(5, 0, 16, 0.85) 75%);
+    pointer-events: none;
+  }
+  .landing::after {
+    /* subtle scan-lines on landing too */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(123, 44, 255, 0.03) 2px, rgba(123, 44, 255, 0.03) 3px);
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+  .landing.done {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(1.06);
+  }
+  .landing-inner {
+    position: relative;
+    z-index: 2;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 70px 40px 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .landing-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.5em;
+    color: var(--orange);
+    margin-bottom: 26px;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .landing-eyebrow::before, .landing-eyebrow::after {
+    content: "";
+    width: 50px;
+    height: 1px;
+    background: var(--orange);
+    opacity: 0.7;
+  }
+  .landing-logo {
+    font-family: var(--f-display);
+    font-size: clamp(96px, 16vw, 200px);
+    line-height: 0.85;
+    color: var(--cream);
+    letter-spacing: -0.03em;
+    margin: 0 0 22px;
+    text-shadow:
+      3px 3px 0 var(--orange),
+      6px 6px 0 var(--purple-hot),
+      9px 9px 0 var(--magenta);
+  }
+  .landing-logo .dot { color: var(--orange); }
+  .landing-tagline {
+    font-family: var(--f-body);
+    font-size: clamp(16px, 2vw, 20px);
+    color: var(--cream);
+    max-width: 700px;
+    margin-bottom: 38px;
+    letter-spacing: 0.02em;
+  }
+  .landing-tagline em { color: var(--orange); font-style: normal; font-weight: 700; }
+  .landing-lead {
+    font-family: var(--f-body);
+    font-size: clamp(14px, 1.4vw, 17px);
+    line-height: 1.65;
+    color: rgba(244, 236, 216, 0.85);
+    max-width: 760px;
+    margin: 0 auto 56px;
+  }
+  .landing-lead b { color: var(--cream); }
+  .landing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    width: 100%;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 1000px) {
+    .landing-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  }
+  @media (max-width: 560px) {
+    .landing-grid { grid-template-columns: 1fr; }
+  }
+  .landing-card {
+    background:
+      linear-gradient(180deg, rgba(123, 44, 255, 0.1), rgba(10, 5, 24, 0.7));
+    border: 1px solid rgba(244, 236, 216, 0.14);
+    border-radius: 16px;
+    padding: 24px 22px;
+    text-align: left;
+    backdrop-filter: blur(8px);
+    position: relative;
+    transition: all 0.3s;
+  }
+  .landing-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--orange);
+    box-shadow: 0 12px 30px rgba(255, 155, 31, 0.18);
+  }
+  .landing-card::before {
+    content: "";
+    position: absolute;
+    top: 10px; left: 10px;
+    width: 20px; height: 20px;
+    border-top: 2px solid var(--orange);
+    border-left: 2px solid var(--orange);
+    border-top-left-radius: 10px;
+    opacity: 0.7;
+  }
+  .lc-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--orange);
+    margin-bottom: 10px;
+    margin-top: 8px;
+  }
+  .landing-card h3 {
+    font-family: var(--f-display);
+    font-size: 18px;
+    letter-spacing: -0.005em;
+    color: var(--cream);
+    margin: 0 0 10px;
+    line-height: 1.1;
+  }
+  .landing-card p {
+    font-family: var(--f-body);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(244, 236, 216, 0.72);
+    margin: 0;
+  }
+  .landing-cta {
+    background: var(--orange);
+    color: var(--ink);
+    border: none;
+    border-radius: 12px;
+    padding: 20px 44px;
+    font-family: var(--f-mono);
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 8px 24px rgba(255, 155, 31, 0.35), 0 0 0 1px var(--orange);
+    margin-bottom: 20px;
+  }
+  .landing-cta:hover {
+    transform: translateY(-2px);
+    background: var(--magenta);
+    color: var(--cream);
+    box-shadow: 0 12px 32px rgba(255, 43, 214, 0.5), 0 0 0 1px var(--magenta);
+  }
+  .landing-cta:hover .cta-arrow { transform: translateX(6px); }
+  .landing-cta .cta-icon { font-size: 14px; }
+  .landing-cta .cta-arrow { transition: transform 0.2s; font-size: 18px; }
+  .landing-foot {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: rgba(244, 236, 216, 0.5);
+  }
+  .dot-blink {
+    width: 7px;
+    height: 7px;
+    background: var(--cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--cyan);
+    animation: blink-dot 1.4s ease-in-out infinite;
+  }
+  @keyframes blink-dot {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  /* ====== END LANDING ====== */
+
+  /* ====== WARP TUNNEL (wormhole effect) ====== */
+  .warp-tunnel {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at center, rgba(123, 44, 255, 0.4) 0%, rgba(5, 0, 16, 0.95) 60%);
+    overflow: hidden;
+    visibility: hidden;
+  }
+  .warp-tunnel.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* Bright central core that explodes outward */
+  .warp-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, var(--orange) 25%, var(--magenta) 55%, var(--purple-hot) 80%, transparent 100%);
+    transform: translate(-50%, -50%) scale(0);
+    filter: blur(4px);
+    box-shadow: 0 0 120px 40px var(--orange), 0 0 60px 30px #fff;
+  }
+  .warp-tunnel.active .warp-core {
+    animation: warp-core-explode 1.2s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+  }
+  @keyframes warp-core-explode {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 1; filter: blur(4px); }
+    40% { transform: translate(-50%, -50%) scale(15); opacity: 1; filter: blur(6px); }
+    70% { transform: translate(-50%, -50%) scale(35); opacity: 0.85; filter: blur(12px); }
+    100% { transform: translate(-50%, -50%) scale(70); opacity: 0; filter: blur(20px); }
+  }
+
+  /* Speed streaks — radial lines flying outward from center */
+  .warp-streaks {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1px;
+    height: 1px;
+    transform: translate(-50%, -50%);
+  }
+  .warp-streaks span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 200px;
+    border-radius: 4px;
+    transform-origin: top center;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.9) 30%, var(--cyan) 60%, transparent 100%);
+    opacity: 0;
+  }
+  /* place 20 streaks around at every 18deg */
+  .warp-streaks span:nth-child(1)  { transform: rotate(0deg)   translateY(20px); }
+  .warp-streaks span:nth-child(2)  { transform: rotate(18deg)  translateY(20px); }
+  .warp-streaks span:nth-child(3)  { transform: rotate(36deg)  translateY(20px); }
+  .warp-streaks span:nth-child(4)  { transform: rotate(54deg)  translateY(20px); }
+  .warp-streaks span:nth-child(5)  { transform: rotate(72deg)  translateY(20px); }
+  .warp-streaks span:nth-child(6)  { transform: rotate(90deg)  translateY(20px); }
+  .warp-streaks span:nth-child(7)  { transform: rotate(108deg) translateY(20px); }
+  .warp-streaks span:nth-child(8)  { transform: rotate(126deg) translateY(20px); }
+  .warp-streaks span:nth-child(9)  { transform: rotate(144deg) translateY(20px); }
+  .warp-streaks span:nth-child(10) { transform: rotate(162deg) translateY(20px); }
+  .warp-streaks span:nth-child(11) { transform: rotate(180deg) translateY(20px); }
+  .warp-streaks span:nth-child(12) { transform: rotate(198deg) translateY(20px); }
+  .warp-streaks span:nth-child(13) { transform: rotate(216deg) translateY(20px); }
+  .warp-streaks span:nth-child(14) { transform: rotate(234deg) translateY(20px); }
+  .warp-streaks span:nth-child(15) { transform: rotate(252deg) translateY(20px); }
+  .warp-streaks span:nth-child(16) { transform: rotate(270deg) translateY(20px); }
+  .warp-streaks span:nth-child(17) { transform: rotate(288deg) translateY(20px); }
+  .warp-streaks span:nth-child(18) { transform: rotate(306deg) translateY(20px); }
+  .warp-streaks span:nth-child(19) { transform: rotate(324deg) translateY(20px); }
+  .warp-streaks span:nth-child(20) { transform: rotate(342deg) translateY(20px); }
+
+  .warp-tunnel.active .warp-streaks span {
+    animation: warp-streak-fly 1s linear forwards;
+  }
+  .warp-tunnel.active .warp-streaks span:nth-child(2n)  { animation-delay: 0.04s; }
+  .warp-tunnel.active .warp-streaks span:nth-child(3n)  { animation-delay: 0.08s; }
+  .warp-tunnel.active .warp-streaks span:nth-child(5n)  { animation-delay: 0.12s; }
+  @keyframes warp-streak-fly {
+    0% { opacity: 0; height: 0; transform-origin: top center; }
+    15% { opacity: 1; height: 600px; }
+    100% { opacity: 0; height: 2200px; }
+  }
+
+  /* Concentric rings that scale outward — the wormhole "rim" */
+  .warp-rings {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1px;
+    height: 1px;
+    transform: translate(-50%, -50%);
+  }
+  .warp-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  .warp-ring:nth-child(1) { border: 2px solid var(--cyan); box-shadow: 0 0 30px var(--cyan), inset 0 0 30px var(--cyan); }
+  .warp-ring:nth-child(2) { border: 2px solid var(--orange); box-shadow: 0 0 30px var(--orange), inset 0 0 30px var(--orange); }
+  .warp-ring:nth-child(3) { border: 2px solid var(--magenta); box-shadow: 0 0 30px var(--magenta), inset 0 0 30px var(--magenta); }
+  .warp-ring:nth-child(4) { border: 2px solid var(--purple-hot); box-shadow: 0 0 30px var(--purple-hot), inset 0 0 30px var(--purple-hot); }
+  .warp-ring:nth-child(5) { border: 2px solid var(--cyan); box-shadow: 0 0 30px var(--cyan), inset 0 0 30px var(--cyan); }
+  .warp-ring:nth-child(6) { border: 2px solid var(--orange); box-shadow: 0 0 30px var(--orange), inset 0 0 30px var(--orange); }
+  .warp-ring:nth-child(7) { border: 2px solid #fff; box-shadow: 0 0 50px #fff, inset 0 0 30px #fff; }
+
+  .warp-tunnel.active .warp-ring {
+    animation: warp-ring-expand 1.1s cubic-bezier(0.35, 0, 0.65, 1) forwards;
+  }
+  .warp-tunnel.active .warp-ring:nth-child(1) { animation-delay: 0s; }
+  .warp-tunnel.active .warp-ring:nth-child(2) { animation-delay: 0.08s; }
+  .warp-tunnel.active .warp-ring:nth-child(3) { animation-delay: 0.16s; }
+  .warp-tunnel.active .warp-ring:nth-child(4) { animation-delay: 0.24s; }
+  .warp-tunnel.active .warp-ring:nth-child(5) { animation-delay: 0.32s; }
+  .warp-tunnel.active .warp-ring:nth-child(6) { animation-delay: 0.40s; }
+  .warp-tunnel.active .warp-ring:nth-child(7) { animation-delay: 0.48s; }
+
+  @keyframes warp-ring-expand {
+    0% { transform: translate(-50%, -50%) scale(0.01) rotate(0deg); opacity: 0; }
+    15% { opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(35) rotate(180deg); opacity: 0; }
+  }
+
+  /* Edge vignette darkens during warp for tunnel feel */
+  .warp-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 30%, rgba(5, 0, 16, 0.95) 75%);
+    opacity: 0;
+  }
+  .warp-tunnel.active .warp-vignette {
+    animation: warp-vignette-fade 1.1s ease-out forwards;
+  }
+  @keyframes warp-vignette-fade {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 1; }
+  }
+  /* ====== END WARP TUNNEL ====== */
+
+  /* Mobile adjustments */
+  /* ========= MOBILE / TABLET LAYOUT ========= */
+  @media (max-width: 900px) {
+    /* Top bar slimmed down */
+    .hud-top { padding: 10px 14px; gap: 8px; }
+    .hud-brand { font-size: 16px; }
+    .hud-brand .sub { display: none; }
+    .hud-status { display: none; }
+
+    /* Nav moves to TOP — horizontal scrolling strip below header */
+    .hud-left {
+      position: fixed;
+      top: 50px;
+      left: 10px;
+      right: 10px;
+      width: auto;
+      max-height: none;
+      padding: 8px 10px 6px;
+      border-radius: 12px;
+      background: rgba(10, 5, 24, 0.88);
+      backdrop-filter: blur(14px);
+      z-index: 20;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-left .title { display: none; }
+    .hud-left .nav-section-label {
+      display: none;
+    }
+    .hud-left .nav-list {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      gap: 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 2px 4px;
+      margin: 0;
+      scrollbar-width: none;
+      align-items: center;
+    }
+    .hud-left .nav-list::-webkit-scrollbar { display: none; }
+    .hud-left .nav-item {
+      flex: 0 0 auto;
+      padding: 6px 11px;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      gap: 5px;
+      white-space: nowrap;
+      border-radius: 999px;
+    }
+    .hud-left .nav-item .arrow { display: none; }
+    .btn-intro-reopen {
+      width: auto;
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      font-size: 8px;
+      margin: 0;
+      letter-spacing: 0.18em;
+      border-radius: 999px;
+    }
+    .btn-intro-reopen .ic { display: none; }
+
+    /* Hide right HUD entirely on mobile to free real estate */
+    .hud-right { display: none; }
+
+    /* Bottom: only coords (hidden anyway) */
+    .hud-bottom { padding: 10px 14px; }
+    .coords-display { display: none; }
+
+    /* Target-info: fill width, sit lower so planet (above) is visible */
+    .target-info {
+      top: auto;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      transform: translateY(20px);
+      min-width: 0;
+      max-width: none;
+      width: auto;
+      padding: 18px 20px;
+    }
+    .target-info.visible {
+      transform: translateY(0);
+    }
+    .target-info .name { font-size: 22px; }
+    .target-info .desc { font-size: 11px; margin-bottom: 16px; }
+    .target-info .btn-warp { padding: 11px 14px; font-size: 10px; }
+    .target-info .btn-ghost { padding: 11px 14px; font-size: 10px; }
+
+    /* Smaller central GEEKS sun on mobile */
+    .geeks-core {
+      width: 130px;
+      height: 130px;
+    }
+    .geeks-core-label .name { font-size: 22px; }
+    .geeks-core-label .sub { font-size: 8px; }
+
+    /* Smaller planet labels */
+    .planet-label .name { font-size: 10px; letter-spacing: 0.04em; }
+    .planet-label .tier { display: none; }
+    .hub-hint { display: none; }
+
+    /* Scene exit hub button — sit just below the nav */
+    .btn-exit-hub {
+      top: 100px;
+      padding: 7px 16px;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+    }
+    .scene-indicator {
+      top: 90px;
+      font-size: 8px;
+      letter-spacing: 0.3em;
+    }
+
+    /* Planet detail view: edge-to-edge */
+    .planet-view-inner { padding: 80px 18px 100px; }
+    .pv-card { padding: 18px; }
+    .pv-title { font-size: clamp(36px, 12vw, 60px); }
+    .pv-lead { font-size: 14px; }
+
+    /* Crew manifest mobile fit */
+    .cm-title { font-size: clamp(40px, 13vw, 80px); }
+    .cm-grid { grid-template-columns: 1fr; gap: 16px; }
+    .cm-content { padding: 50px 18px; }
+
+    /* Landing page tighter on mobile */
+    .landing-inner { padding: 40px 18px 60px; }
+    .landing-logo { font-size: clamp(70px, 22vw, 120px); margin-bottom: 14px; }
+    .landing-eyebrow {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      margin-bottom: 16px;
+    }
+    .landing-eyebrow::before, .landing-eyebrow::after { width: 24px; }
+    .landing-tagline { font-size: 14px; margin-bottom: 24px; }
+    .landing-lead { font-size: 13px; margin-bottom: 32px; line-height: 1.55; }
+    .landing-grid { gap: 10px; margin-bottom: 36px; }
+    .landing-card { padding: 18px 16px; }
+    .landing-card h3 { font-size: 15px; }
+    .landing-card p { font-size: 11.5px; }
+    .landing-cta {
+      padding: 16px 28px;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      gap: 12px;
+    }
+    .landing-foot { font-size: 9px; letter-spacing: 0.2em; }
+  }
+
+  /* Very small phones — even tighter */
+  @media (max-width: 480px) {
+    .hud-top { padding: 8px 12px; }
+    .hud-brand { font-size: 14px; }
+    .hud-left { top: 46px; padding: 8px 10px; }
+    .hud-left .nav-item { padding: 6px 10px; font-size: 9px; }
+    .btn-exit-hub { top: 102px; font-size: 8px; padding: 6px 14px; }
+    .scene-indicator { top: 82px; }
+    .geeks-core { width: 110px; height: 110px; }
+    .target-info .name { font-size: 19px; }
+  }
+
+  /* Shrink visual orbit rings on mobile so they match scaled planet orbits */
+  @media (max-width: 900px) {
+    .galaxy-stage > .orbit:nth-of-type(1) { width: 270px !important; height: 270px !important; }
+    .galaxy-stage > .orbit:nth-of-type(2) { width: 500px !important; height: 500px !important; }
+    .galaxy-stage > .orbit:nth-of-type(3) { width: 770px !important; height: 770px !important; }
+  }
+  @media (max-width: 480px) {
+    .galaxy-stage > .orbit:nth-of-type(1) { width: 220px !important; height: 220px !important; }
+    .galaxy-stage > .orbit:nth-of-type(2) { width: 400px !important; height: 400px !important; }
+    .galaxy-stage > .orbit:nth-of-type(3) { width: 620px !important; height: 620px !important; }
+  }
+  /* ========= END MOBILE ========= */
+
+  /* Toast / warp message */
+  .warp-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 200;
+    background: rgba(5, 0, 16, 0.9);
+    border: 1px solid var(--orange);
+    border-radius: 14px;
+    padding: 30px 50px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .warp-toast.show { opacity: 1; }
+  .warp-toast .lbl {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--orange);
+    margin-bottom: 10px;
+  }
+  .warp-toast .target {
+    font-family: var(--f-display);
+    font-size: 36px;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+  }
+  .warp-toast .progress {
+    margin-top: 16px;
+    height: 2px;
+    background: rgba(244, 236, 216, 0.2);
+    overflow: hidden;
+  }
+  .warp-toast .progress span {
+    display: block;
+    height: 100%;
+    background: var(--orange);
+    width: 0;
+    transition: width 0.5s linear;
+  }
+  .warp-toast.show .progress span { width: 100%; }
+
+</style>
+</head>
+<body data-scene="main">
+<div class="scene-indicator">// GALAXY ▸ <span class="accent">MEDIA HUB</span></div>
+<button class="btn-exit-hub" id="btn-exit-hub">← TERUG NAAR GALAXY</button>
+
+<!-- ============ LANDING PAGE ============ -->
+<div class="landing" id="landing">
+  <div class="landing-inner">
+    <div class="landing-eyebrow">// DE GEEK UNIVERSE · BE ⋅ 2026</div>
+    <h1 class="landing-logo">GEEKS<span class="dot">.</span></h1>
+    <div class="landing-tagline">Belgian geek HQ. <em>Voor wie het altijd al was.</em></div>
+
+    <p class="landing-lead">
+      Geek culture is in België allang geen niche meer — maar het wordt nog wel zo behandeld.
+      Versnipperde communities, geïmporteerde formats, géén plek die het samenbrengt.
+      <b>Tot nu.</b> Wij bouwen het Belgische platform waar geeks zich thuis voelen, online én offline.
+    </p>
+
+    <div class="landing-grid">
+      <div class="landing-card">
+        <div class="lc-eyebrow">// WAT IS GEEKS</div>
+        <h3>Een Belgisch geek-platform</h3>
+        <p>Een vodcast, een talkshow op VRT MAX, daily content op socials, events, en ooit een fysieke hub. Allemaal vanuit één crew, één plek, één stem.</p>
+      </div>
+      <div class="landing-card">
+        <div class="lc-eyebrow">// WAT IS EEN GEEK</div>
+        <h3>Niet één type. Veel types.</h3>
+        <p>Iemand die diep in een wereld duikt — games, films, manga, K-pop, tech, board games — en daar méér in ziet dan ontspanning. Geen niche, wel passie.</p>
+      </div>
+      <div class="landing-card">
+        <div class="lc-eyebrow">// VOOR WIE</div>
+        <h3>Voor wie het altijd al was</h3>
+        <p>Geeks die nooit herkenning voelden in de Belgische mainstream. Stemmen die genegeerd worden. Mensen die hun passie niet meer willen uitleggen.</p>
+      </div>
+      <div class="landing-card">
+        <div class="lc-eyebrow">// HOE WE HET DOEN</div>
+        <h3>Community boven content</h3>
+        <p>Drie hosts, drie classes, één crew. Geen polish die in de weg zit, geen import, geen gatekeeping. Belgische geek culture, op zijn eigen manier.</p>
+      </div>
+    </div>
+
+    <button class="landing-cta" id="landing-cta">
+      <span class="cta-icon">▶</span>
+      <span class="cta-text">EXPLORE THE UNIVERSE</span>
+      <span class="cta-arrow">→</span>
+    </button>
+
+    <div class="landing-foot">
+      <span class="dot-blink"></span>
+      <span>// SYSTEM READY · CLICK TO ENTER</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ UNIVERSE ============ -->
+<div class="universe" id="universe">
+  <canvas id="starfield"></canvas>
+
+  <div class="galaxy-viewport">
+    <div class="galaxy-stage" id="stage">
+      <!-- Orbit rings -->
+      <div class="orbit" style="width: 600px; height: 600px;"></div>
+      <div class="orbit" style="width: 1100px; height: 1100px;"></div>
+      <div class="orbit" style="width: 1700px; height: 1700px;"></div>
+
+      <!-- GEEKS Core -->
+      <div class="geeks-core" data-target="core"></div>
+      <div class="geeks-core-label">
+        GEEKS<br><span class="sub">// CORE</span>
+      </div>
+
+      <!-- Planets will be injected via JS -->
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div class="hud">
+    <!-- Top -->
+    <div class="hud-top">
+      <div class="hud-brand">
+        <span class="star"></span>
+        GEEKS<span class="dot">.</span>
+        <span class="sub">// UNIVERSE NAVIGATOR v1.0</span>
+      </div>
+      <div class="hud-status">
+        <div class="item"><span class="dot"></span>SYSTEM ONLINE</div>
+        <div class="item warn"><span class="dot"></span>WARP DRIVE: READY</div>
+        <div class="item"><span class="dot"></span>SECTOR: BE-2026</div>
+      </div>
+    </div>
+
+    <!-- Left: planet nav -->
+    <div class="hud-left">
+      <button class="btn-intro-reopen" id="btn-intro-reopen" title="Toon intro opnieuw">
+        <span class="ic">↺</span> INTRO
+      </button>
+      <div class="title">// DESTINATIONS</div>
+      <div class="nav-list" id="nav-list"><!-- injected --></div>
+    </div>
+
+    <!-- Right: minimap + controls -->
+    <div class="hud-right">
+      <div class="minimap">
+        <div class="title">// SYSTEM MAP</div>
+        <div class="minimap-canvas" id="minimap">
+          <div class="minimap-core"></div>
+          <div class="minimap-viewport" id="minimap-viewport"></div>
+          <!-- planet dots injected -->
+        </div>
+      </div>
+
+      <div class="controls-card">
+        <div class="title">// CONTROLS</div>
+        <div class="row"><span>Pan</span><span class="key">DRAG</span></div>
+        <div class="row"><span>Zoom</span><span class="key">SCROLL</span></div>
+        <div class="row"><span>Reset</span><span class="key">R</span></div>
+        <div class="row"><span>Back</span><span class="key">ESC</span></div>
+        <div class="row" style="border-top: 1px dashed rgba(244,236,216,0.15); margin-top: 6px; padding-top: 8px;"><span>Crew</span><span class="key">CLICK CORE</span></div>
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div class="hud-bottom">
+      <div class="coords-display">
+        <div class="row"><span class="lbl">X</span><span class="val" id="coord-x">0000.00</span></div>
+        <div class="row"><span class="lbl">Y</span><span class="val" id="coord-y">0000.00</span></div>
+        <div class="row"><span class="lbl">ZOOM</span><span class="val" id="coord-z">1.00x</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Target info — centered dialog (outside universe so transform doesn't affect it) -->
+  <div class="target-info" id="target-info">
+    <div class="label">// TARGET LOCKED</div>
+    <div class="name" id="target-name">—</div>
+    <div class="desc" id="target-desc">—</div>
+    <div class="actions">
+      <button class="btn-warp" id="warp-btn"><span class="icon">▶</span> WARP // ENGAGE</button>
+      <button class="btn-ghost" id="deselect-btn">DESELECT</button>
+    </div>
+  </div>
+
+  <!-- Warp toast -->
+  <div class="warp-toast" id="warp-toast">
+    <div class="lbl">// WARPING TO</div>
+    <div class="target" id="warp-target">—</div>
+    <div class="progress"><span></span></div>
+  </div>
+</div>
+
+<!-- ============ WARP TUNNEL (wormhole effect) ============ -->
+<div class="warp-tunnel" id="warp-tunnel" aria-hidden="true">
+  <div class="warp-core"></div>
+  <div class="warp-streaks">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <div class="warp-rings">
+    <div class="warp-ring"></div>
+    <div class="warp-ring"></div>
+    <div class="warp-ring"></div>
+    <div class="warp-ring"></div>
+    <div class="warp-ring"></div>
+    <div class="warp-ring"></div>
+    <div class="warp-ring"></div>
+  </div>
+  <div class="warp-vignette"></div>
+</div>
+
+<!-- ============ CREW MANIFEST (easter egg) ============ -->
+<div class="crew-manifest" id="crew-manifest">
+  <div class="cm-stage">
+    <div class="cm-bg"></div>
+    <div class="cm-content">
+      <div class="cm-eyebrow">// CREW MANIFEST</div>
+      <h1 class="cm-title">GEEKS<span class="dot">.</span></h1>
+      <p class="cm-tagline">Drie founders. Eén crew. <em>Drie manieren om hetzelfde door te hebben.</em></p>
+      <div class="cm-roster">
+        <div class="cm-card" style="--cm-color: #25e0ff">
+          <div class="id">// HOST_02</div>
+          <div class="name">ISSAM</div>
+          <div class="class">Dual Mode Caster</div>
+          <div class="blurb">Vraagt het simpele. Snijdt het diep. Connector van tegengestelde takes.</div>
+        </div>
+        <div class="cm-card" style="--cm-color: #7B2CFF">
+          <div class="id">// HOST_01</div>
+          <div class="name">HAMZA</div>
+          <div class="class">Story-Driven Strategist</div>
+          <div class="blurb">Emotionele speler met lore-discipline. Voelt wanneer een verhaal écht doorklikt.</div>
+        </div>
+        <div class="cm-card" style="--cm-color: #ff4060">
+          <div class="id">// HOST_03</div>
+          <div class="name">JOENES</div>
+          <div class="class">Chaos Rogue</div>
+          <div class="blurb">Headshot first. Cutscene never. Skip the tutorial, we zien wel.</div>
+        </div>
+      </div>
+      <button class="cm-close" id="cm-close-btn">RETURN TO GALAXY</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLANET VIEW (when warped in) ============ -->
+<div class="planet-view" id="planet-view">
+  <div class="planet-view-inner" id="planet-view-inner">
+    <!-- content injected -->
+  </div>
+</div>
+
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<script>
+// =====================================================================
+// PLANETS DATA — two scenes
+// Main galaxy: GEEKS MEDIA (hub) + universe context (INHABITANTS, SPECTATORS, THE PITCH)
+// Media sub-galaxy (when you click MEDIA): the 3 show properties + center mini-Geeks (missie)
+// =====================================================================
+
+const MAIN_PLANETS = [
+  {
+    id: 'media',
+    name: 'GEEKS MEDIA',
+    short: 'GEEKS MEDIA',
+    tier: '// MEDIA HUB · 3 PROPERTIES',
+    desc: 'De show. Vodcast, talkshow, daily content. Klik om in te zoomen op het media-cluster.',
+    orbit: 540, angle: -30, size: 110,
+    color: '#ff9b1f', glow: 'rgba(255,155,31,0.65)', orbitDuration: 180, orbitDelay: 0,
+    bg: 'radial-gradient(circle at 30% 30%, #ffc26d, #ff9b1f 50%, #802b00 100%)',
+    type: 'hub',
+    scene: 'main',
+    hasRing: true,
+  },
+  {
+    id: 'inhabitants',
+    name: 'INHABITANTS',
+    short: 'INHABITANTS',
+    tier: '// THE MAKERS · 3',
+    desc: 'De inwoners van Planeet Geek. Drie founders. Drie classes. Klik om de crew te selecteren.',
+    orbit: 700, angle: 110, size: 96,
+    color: '#ffd24a', glow: 'rgba(255,210,74,0.6)', orbitDuration: 220, orbitDelay: -60,
+    bg: 'radial-gradient(circle at 30% 30%, #ffe793, #ffd24a 50%, #6b5410 100%)',
+    type: 'universe',
+    scene: 'main',
+  },
+  {
+    id: 'spectators',
+    name: 'SPECTATORS',
+    short: 'SPECTATORS',
+    tier: '// THE TRIBES · 4',
+    desc: 'Voor wie dit gemaakt wordt. Vier soorten geeks, geen hiërarchie tussen ze. Kies je stam.',
+    orbit: 820, angle: 220, size: 92,
+    color: '#7B2CFF', glow: 'rgba(123,44,255,0.6)', orbitDuration: 250, orbitDelay: -130,
+    bg: 'radial-gradient(circle at 30% 30%, #b48bff, #7B2CFF 50%, #2a0e6e 100%)',
+    type: 'universe',
+    scene: 'main',
+  },
+  {
+    id: 'pitch',
+    name: 'THE PITCH',
+    short: 'THE PITCH',
+    tier: '// DATA + STORY',
+    desc: 'Waarom dit nu gemaakt moet worden. De cijfers, de context, het hele verhaal.',
+    orbit: 940, angle: -130, size: 84,
+    color: '#ff4060', glow: 'rgba(255,64,96,0.6)', orbitDuration: 280, orbitDelay: -190,
+    bg: 'radial-gradient(circle at 30% 30%, #ff7a90, #ff4060 50%, #6e0a1f 100%)',
+    type: 'universe',
+    scene: 'main',
+    hasRing: true,
+  },
+];
+
+const MEDIA_PLANETS = [
+  {
+    id: 'unregulated',
+    name: 'GEEKS UNREGULATED',
+    short: 'UNREGULATED',
+    tier: 'GEEKS // PODCAST',
+    desc: 'De vodcast. Eén uur, vaste structuur, op Twitch live. De anti-gepolijste plek waar de drie freewheelen.',
+    orbit: 420, angle: -60, size: 92,
+    color: '#ff9b1f', glow: 'rgba(255,155,31,0.65)', orbitDuration: 130, orbitDelay: 0,
+    bg: 'radial-gradient(circle at 30% 30%, #ffc26d, #ff9b1f 50%, #802b00 100%)',
+    type: 'property',
+    scene: 'media',
+    hasRing: true,
+  },
+  {
+    id: 'talkshow',
+    name: 'GEEKS TALKSHOW',
+    short: 'TALKSHOW',
+    tier: 'GEEKS // VRT MAX',
+    desc: 'De videoreeks op VRT MAX. Eén host neemt de andere twee mee in zijn geek-wereld. Piloot opgenomen 25/03/2026.',
+    orbit: 460, angle: 70, size: 86,
+    color: '#ff2bd6', glow: 'rgba(255,43,214,0.65)', orbitDuration: 150, orbitDelay: -40,
+    bg: 'radial-gradient(circle at 30% 30%, #ff8de8, #ff2bd6 50%, #5a0048 100%)',
+    type: 'property',
+    scene: 'media',
+  },
+  {
+    id: 'daily',
+    name: 'GEEKS DAILY',
+    short: 'DAILY · SOCIALS',
+    tier: 'GEEKS // SHORTS',
+    desc: 'Korte daily geek-content op socials. Reacties, hot takes, news drops. Snel, snackable, dagelijks.',
+    orbit: 380, angle: 190, size: 76,
+    color: '#25e0ff', glow: 'rgba(37,224,255,0.65)', orbitDuration: 105, orbitDelay: -75,
+    bg: 'radial-gradient(circle at 30% 30%, #7df0ff, #25e0ff 50%, #08475a 100%)',
+    type: 'property',
+    scene: 'media',
+  },
+];
+
+const PLANETS = [...MAIN_PLANETS, ...MEDIA_PLANETS];
+
+// Planeet Geek is the central anchor in the MEDIA sub-galaxy — not orbiting,
+// just there for the openPlanetView lookup
+PLANETS.push({
+  id: 'planet-geek',
+  name: 'DE GEEK UNIVERSE',
+  short: 'DE GEEK UNIVERSE',
+  tier: '// HOME WORLD · MISSIE',
+  desc: 'Waar het allemaal voor staat. Het waarom, het wie, het tegen wat. De thuiswereld van het GEEKS-universum.',
+  orbit: 0, angle: 0, size: 1,
+  color: '#6efb89', glow: 'rgba(110,251,137,0.6)', orbitDuration: 999, orbitDelay: 0,
+  bg: 'radial-gradient(circle at 30% 30%, #b3fcc5, #6efb89 50%, #1f5c33 100%)',
+  type: 'virtual',
+  scene: 'hidden',
+});
+
+// Track current scene
+let currentScene = 'main';
+
+// ===== MOBILE: scale orbit radii + planet sizes so universe fits the screen =====
+const IS_MOBILE = window.matchMedia('(max-width: 900px)').matches;
+const IS_SMALL_MOBILE = window.matchMedia('(max-width: 480px)').matches;
+if (IS_MOBILE) {
+  const orbitScale = IS_SMALL_MOBILE ? 0.36 : 0.45;
+  const sizeScale = IS_SMALL_MOBILE ? 0.55 : 0.65;
+  PLANETS.forEach(p => {
+    if (p.scene === 'hidden') return; // skip virtual planet-geek
+    p.orbit = Math.round(p.orbit * orbitScale);
+    p.size = Math.round(p.size * sizeScale);
+  });
+}
+
+// ---- HOSTS (sub-planets, accessed via INHABITANTS) ----
+const HOSTS = [
+  {
+    id: 'hamza',
+    name: 'HAMZA',
+    short: 'HAMZA',
+    tier: 'HOST CLASS · LV.99',
+    desc: 'Story-Driven Strategist. Emotionele speler, lore-discipline. Hub van complexe vrouwelijke protagonisten.',
+    color: '#7B2CFF', glow: 'rgba(123,44,255,0.6)',
+    img: 'assets/hamza-full.jpg',
+    class: 'Story-Driven Strategist',
+    tag: 'Speelt elk verhaal alsof het echt is.',
+    stats: [
+      { lbl: 'CHAOS', val: '42', bar: 42 },
+      { lbl: 'LORE MASTERY', val: '99', bar: 99 },
+      { lbl: 'EMPATHY', val: '95', bar: 95 },
+      { lbl: 'COMBAT', val: '60', bar: 60 },
+    ],
+    skills: [
+      '<b>Narrative Sense</b> — voelt wanneer een verhaal écht doorklikt',
+      '<b>Strategic Patience</b> — bouwt traag, slaat hard',
+      '<b>Empathy Lock</b> — bondt direct met complexe personages',
+      '<b>Soft Spot</b> — onverwacht emotioneel bij story beats',
+    ],
+    weapon: 'BOOK + FEATHER · grimoire van geek-lore',
+    quote: '"Als het verhaal kraakt onder de oppervlakte, ben ik thuis."',
+    trivia: 'Heeft een vier-uur-durende monoloog over de moraal van The Last of Us Part II. Vraag er niet naar tenzij je tijd hebt.',
+  },
+  {
+    id: 'issam',
+    name: 'ISSAM',
+    short: 'ISSAM',
+    tier: 'HOST CLASS · LV.99',
+    desc: 'Dual Mode Caster. Gelaagd, schijnbaar simpele vragen die diep snijden.',
+    color: '#25e0ff', glow: 'rgba(37,224,255,0.6)',
+    img: 'assets/issam-full.jpg',
+    class: 'Dual Mode Caster',
+    tag: 'Vraagt het simpele. Snijdt het diep.',
+    stats: [
+      { lbl: 'INSIGHT', val: '94', bar: 94 },
+      { lbl: 'CHARM', val: '88', bar: 88 },
+      { lbl: 'UNCERTAINTY', val: '70', bar: 70 },
+      { lbl: 'STAGE PRESENCE', val: '92', bar: 92 },
+    ],
+    skills: [
+      '<b>Dual Mode</b> — wisselt tussen warmte en analyse zonder waarschuwing',
+      '<b>Sincerity Uncertainty</b> — laat dingen open zodat anderen invullen',
+      '<b>Slow Question</b> — vraagt het ene wat je niet zag aankomen',
+      '<b>Connector</b> — bouwt bruggen tussen tegengestelde takes',
+    ],
+    weapon: 'BLUE MAGIC · synthese-staf',
+    quote: '"Wacht — maar waarom denk je dat dan eigenlijk?"',
+    trivia: 'Beanie zit standaard op. Niemand weet of er haar onder zit. Bewuste design-keuze.',
+  },
+  {
+    id: 'joenes',
+    name: 'JOENES',
+    short: 'JOENES',
+    tier: 'HOST CLASS · LV.99',
+    desc: 'Chaos Rogue. Hot takes, headshot accuracy, "skip first, ask never".',
+    color: '#ff4060', glow: 'rgba(255,64,96,0.6)',
+    img: 'assets/joenes-full.jpg',
+    class: 'Chaos Rogue',
+    tag: 'Headshot first. Cutscene never.',
+    stats: [
+      { lbl: 'CHAOS', val: '99', bar: 99 },
+      { lbl: 'HOT TAKES', val: '99', bar: 99 },
+      { lbl: 'PATIENCE', val: '12', bar: 12 },
+      { lbl: 'AIM', val: '94', bar: 94 },
+    ],
+    skills: [
+      '<b>Skip Cutscene</b> — passive: alle dialoog wordt geskipt',
+      '<b>Hot Take Cannon</b> — direct controversy, geen aanloop',
+      '<b>Headshot Reflex</b> — pure muscle memory',
+      '<b>No Geduld</b> — kan een tutorial niet uitzitten',
+    ],
+    weapon: 'FLAMING DAGGERS · dual-wield, geen sheath',
+    quote: '"Bro, gewoon spelen. We zien wel."',
+    trivia: 'Heeft één keer een hele aflevering Skyrim doorgespeeld zonder enige NPC-quest aan te raken. Pure exploration.',
+  },
+];
+
+const TRIBES = [
+  {
+    id: '01',
+    name: 'Lore Keeper',
+    age: '18–28',
+    color: '#ff2bd6',
+    tint: 'rgba(255,43,214,0.08)',
+    desc: 'Leeft in verhalen en analyse. Houdt van worldbuilding en emotionele diepgang. Long-form essays, Reddit threads, sensitief en reflectief.',
+    quote: '"Ik wil praten over waarom dat ene personage dat ene ding deed — niet alleen of de anime goed was."',
+  },
+  {
+    id: '02',
+    name: 'Community Player',
+    age: '16–30',
+    color: '#25e0ff',
+    tint: 'rgba(37,224,255,0.08)',
+    desc: 'Ervaart geek culture als iets sociaal. Speelt om samen te zijn, niet om te winnen. Discord altijd open, vibe boven skill.',
+    quote: '"Ik wil gewoon spelen, praten, lachen — zonder dat iemand doet alsof het serieus is."',
+  },
+  {
+    id: '03',
+    name: 'Collector',
+    age: '20–35',
+    color: '#ff9b1f',
+    tint: 'rgba(255,155,31,0.08)',
+    desc: 'Bouwt een eigen mini-universum van objecten en esthetiek. Figurines, manga, art prints, closet cosplay. Passie is voelbaar.',
+    quote: '"Ik hoef niet hard te praten om geek te zijn. Ik bén het gewoon."',
+  },
+  {
+    id: '04',
+    name: 'Cozy Mobile Gamer',
+    age: '24–50',
+    color: '#7B2CFF',
+    tint: 'rgba(123,44,255,0.08)',
+    desc: 'Speelt op eigen ritme, naast het leven. Gaming is rustmoment, geen competitie. Candy Crush, Switch, soms een Stardew-sessie.',
+    quote: '"Ik ben ook een gamer — gewoon op mijn manier. En ik wil daar niet op judged worden."',
+  },
+];
+
+// =====================================================================
+// STARFIELD
+// =====================================================================
+const canvas = document.getElementById('starfield');
+const ctx = canvas.getContext('2d');
+let stars = [];
+let cw, ch;
+
+function resizeCanvas() {
+  cw = canvas.width = window.innerWidth * window.devicePixelRatio;
+  ch = canvas.height = window.innerHeight * window.devicePixelRatio;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  initStars();
+}
+
+function initStars() {
+  stars = [];
+  const w = window.innerWidth, h = window.innerHeight;
+  // 3 layers: far (small, slow), mid, near (big, fast)
+  for (let i = 0; i < 250; i++) {
+    stars.push({ x: Math.random() * w, y: Math.random() * h, r: Math.random() * 0.7 + 0.2, depth: 0.2, tw: Math.random() * Math.PI * 2 });
+  }
+  for (let i = 0; i < 120; i++) {
+    stars.push({ x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.2 + 0.5, depth: 0.5, tw: Math.random() * Math.PI * 2 });
+  }
+  for (let i = 0; i < 60; i++) {
+    stars.push({ x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.8 + 0.8, depth: 1.0, tw: Math.random() * Math.PI * 2 });
+  }
+}
+
+let starTime = 0;
+function drawStars() {
+  const w = window.innerWidth, h = window.innerHeight;
+  ctx.clearRect(0, 0, w, h);
+  starTime += 0.02;
+  const offX = -camera.x * 0.15, offY = -camera.y * 0.15;
+  for (const s of stars) {
+    const px = ((s.x + offX * s.depth) % w + w) % w;
+    const py = ((s.y + offY * s.depth) % h + h) % h;
+    const twinkle = 0.6 + 0.4 * Math.sin(starTime + s.tw);
+    ctx.globalAlpha = twinkle * (0.3 + s.depth * 0.7);
+    ctx.fillStyle = s.depth > 0.7 ? '#fff' : (s.depth > 0.3 ? '#cdd5ff' : '#e8d6ff');
+    ctx.beginPath();
+    ctx.arc(px, py, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// =====================================================================
+// CAMERA
+// =====================================================================
+const _INIT_ZOOM = IS_MOBILE ? 0.75 : 0.7;
+const camera = {
+  x: 0, y: 0, zoom: _INIT_ZOOM,
+  targetX: 0, targetY: 0, targetZoom: _INIT_ZOOM,
+  minZoom: 0.3, maxZoom: 3.5,
+};
+
+const stage = document.getElementById('stage');
+
+function applyCamera() {
+  // The stage is at top:50% left:50%, we shift by -camera offset and scale
+  const tx = -camera.x;
+  const ty = -camera.y;
+  stage.style.transform = `scale(${camera.zoom}) translate(${tx}px, ${ty}px)`;
+}
+
+function updateCoords() {
+  document.getElementById('coord-x').textContent = camera.x.toFixed(2).padStart(7, '0');
+  document.getElementById('coord-y').textContent = camera.y.toFixed(2).padStart(7, '0');
+  document.getElementById('coord-z').textContent = camera.zoom.toFixed(2) + 'x';
+}
+
+function updateMinimap() {
+  // Minimap shows world space; viewport rect represents what camera sees.
+  // World extent: -1300 to 1300 = 2600 wide
+  const worldExtent = 2600;
+  const mm = document.getElementById('minimap-viewport');
+  const mmW = document.getElementById('minimap').offsetWidth;
+  const vpW = window.innerWidth / camera.zoom;
+  const vpH = window.innerHeight / camera.zoom;
+  const sizeX = Math.min(95, (vpW / worldExtent) * 100);
+  const sizeY = Math.min(95, (vpH / worldExtent) * 100);
+  const posX = 50 + (camera.x / worldExtent) * 100;
+  const posY = 50 + (camera.y / worldExtent) * 100;
+  mm.style.width = sizeX + '%';
+  mm.style.height = sizeY + '%';
+  mm.style.left = posX + '%';
+  mm.style.top = posY + '%';
+  mm.style.transform = 'translate(-50%, -50%)';
+}
+
+function animateCamera() {
+  // If a planet is selected and we're in galaxy view, track its orbit position
+  // Plus offset upward so planet appears above the centered target-info dialog
+  if (selectedId && !document.getElementById('planet-view').classList.contains('open')) {
+    const sel = PLANETS.find(p => p.id === selectedId);
+    if (sel && sel.scene !== 'hidden') {
+      const pos = getPlanetWorldPos(sel);
+      const offsetUpWorld = 230 / Math.max(camera.targetZoom, 0.3);
+      camera.targetX = pos.x;
+      camera.targetY = pos.y + offsetUpWorld;
+    }
+  }
+  const dx = camera.targetX - camera.x;
+  const dy = camera.targetY - camera.y;
+  const dz = camera.targetZoom - camera.zoom;
+  const ease = 0.085;
+  camera.x += dx * ease;
+  camera.y += dy * ease;
+  camera.zoom += dz * ease;
+  applyCamera();
+  updateCoords();
+  updateMinimap();
+  updateMinimapDots();
+  drawStars();
+  requestAnimationFrame(animateCamera);
+}
+applyCamera();
+// animateCamera() will be invoked at the bottom, after minimapDots is initialized
+
+// =====================================================================
+// BUILD PLANETS
+// =====================================================================
+function buildPlanets() {
+  // Position each planet using orbit + angle (so we can later place them with orbit-track rotation)
+  PLANETS.forEach((p) => {
+    // create orbit-track wrapper for rotation
+    const track = document.createElement('div');
+    track.className = 'orbit-track';
+    track.dataset.scene = p.scene;
+    track.style.setProperty('--orbit-duration', p.orbitDuration + 's');
+    track.style.setProperty('--orbit-delay', (p.orbitDelay || 0) + 's');
+    // initial position via angle
+    const rad = (p.angle || 0) * Math.PI / 180;
+    const px = Math.cos(rad) * p.orbit;
+    const py = Math.sin(rad) * p.orbit;
+    track.style.left = '0px';
+    track.style.top = '0px';
+
+    const planet = document.createElement('div');
+    planet.className = 'planet';
+    planet.dataset.id = p.id;
+    planet.dataset.scene = p.scene;
+    planet.style.width = p.size + 'px';
+    planet.style.height = p.size + 'px';
+    planet.style.left = px + 'px';
+    planet.style.top = py + 'px';
+    planet.style.setProperty('--planet-glow', p.glow);
+    planet.style.setProperty('--planet-color', p.color);
+
+    let ringHTML = '';
+    if (p.hasRing) {
+      ringHTML = '<div class="planet-ring"></div><div class="planet-ring inner"></div>';
+    }
+
+    let hubHint = '';
+    if (p.id === 'media') {
+      hubHint = '<div class="hub-hint">▸ ENTER HUB</div>';
+    }
+
+    planet.innerHTML = `
+      <div class="planet-orb-wrap">
+        <div class="planet-orb" style="background: ${p.bg}"></div>
+        ${ringHTML}
+        <div class="planet-reticle">
+          <div class="bracket tl"></div>
+          <div class="bracket tr"></div>
+          <div class="bracket bl"></div>
+          <div class="bracket br"></div>
+        </div>
+        <div class="planet-label">
+          <div class="name">${p.short}</div>
+          <div class="tier">${p.tier}</div>
+        </div>
+        ${hubHint}
+      </div>
+    `;
+    planet.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // MEDIA is a hub — clicking enters sub-galaxy instead of opening detail
+      if (p.id === 'media') {
+        enterMediaHub();
+        return;
+      }
+      selectPlanet(p.id);
+    });
+    planet.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      if (p.id === 'media') {
+        enterMediaHub();
+        return;
+      }
+      warpToPlanet(p.id);
+    });
+
+    track.appendChild(planet);
+    stage.appendChild(track);
+  });
+}
+
+buildPlanets();
+
+// =====================================================================
+// LEFT NAV LIST — grouped by orbit
+// =====================================================================
+const navList = document.getElementById('nav-list');
+
+function makeNavItem(p) {
+  const btn = document.createElement('button');
+  btn.className = 'nav-item';
+  btn.dataset.id = p.id;
+  btn.style.setProperty('--nav-color', p.color);
+  btn.innerHTML = `
+    <span class="dot"></span>
+    <span>${p.short}</span>
+    <span class="arrow">▸</span>
+  `;
+  btn.addEventListener('click', () => {
+    if (p.id === 'media') {
+      enterMediaHub();
+      return;
+    }
+    selectPlanet(p.id);
+    setTimeout(() => warpToPlanet(p.id), 400);
+  });
+  return btn;
+}
+
+// Initial nav: just main scene
+rebuildNav();
+
+// =====================================================================
+// MINIMAP DOTS
+// =====================================================================
+const minimapEl = document.getElementById('minimap');
+const worldExtent = 2600;
+const minimapDots = [];
+PLANETS.forEach((p) => {
+  if (p.scene === 'hidden') return; // skip virtual planets
+  const dot = document.createElement('div');
+  dot.className = 'minimap-dot';
+  dot.dataset.scene = p.scene;
+  dot.style.setProperty('--dot-color', p.color);
+  dot.title = p.short;
+  minimapEl.appendChild(dot);
+  minimapDots.push({ el: dot, planet: p });
+});
+
+function updateMinimapDots() {
+  if (typeof minimapDots === 'undefined') return;
+  // Planets rotate around (0,0) over orbitDuration seconds
+  // current rotation angle = (currentTime / orbitDuration) * 360
+  const now = performance.now() / 1000;
+  minimapDots.forEach(({ el, planet }) => {
+    const startAngle = (planet.angle || 0) * Math.PI / 180;
+    const rotation = ((now - (planet.orbitDelay || 0)) / planet.orbitDuration) * Math.PI * 2;
+    const ang = startAngle + rotation;
+    const px = Math.cos(ang) * planet.orbit;
+    const py = Math.sin(ang) * planet.orbit;
+    el.style.left = (50 + (px / worldExtent) * 100) + '%';
+    el.style.top = (50 + (py / worldExtent) * 100) + '%';
+  });
+}
+
+// =====================================================================
+// SELECTION + WARP
+// =====================================================================
+let selectedId = null;
+
+function getPlanetWorldPos(planet) {
+  const now = performance.now() / 1000;
+  const startAngle = (planet.angle || 0) * Math.PI / 180;
+  // CSS animation-delay is negative => animation started in past, so effective time = now - delay
+  const rotation = ((now - (planet.orbitDelay || 0)) / planet.orbitDuration) * Math.PI * 2;
+  const ang = startAngle + rotation;
+  return {
+    x: Math.cos(ang) * planet.orbit,
+    y: Math.sin(ang) * planet.orbit,
+  };
+}
+
+function selectPlanet(id) {
+  const p = PLANETS.find(x => x.id === id);
+  if (!p) return;
+  selectedId = id;
+
+  // Highlight in nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.id === id));
+
+  // Target info
+  document.getElementById('target-name').textContent = p.name;
+  document.getElementById('target-desc').textContent = p.desc;
+  document.getElementById('target-info').classList.add('visible');
+
+  document.getElementById('warp-btn').onclick = () => warpToPlanet(id);
+  document.getElementById('deselect-btn').onclick = deselectPlanet;
+
+  // Move camera to look at planet (current rotated position) with upward offset so planet sits above dialog
+  const pos = getPlanetWorldPos(p);
+  const offsetUp = 230 / 1.4;
+  camera.targetX = pos.x;
+  camera.targetY = pos.y + offsetUp;
+  camera.targetZoom = 1.4;
+}
+
+function deselectPlanet() {
+  selectedId = null;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('target-info').classList.remove('visible');
+  camera.targetX = 0;
+  camera.targetY = 0;
+  camera.targetZoom = _INIT_ZOOM;
+}
+
+function warpToPlanet(id) {
+  const p = PLANETS.find(x => x.id === id);
+  if (!p) return;
+
+  // Trigger wormhole warp tunnel effect
+  const tunnel = document.getElementById('warp-tunnel');
+  tunnel.classList.add('active');
+
+  // Show warp toast
+  const toast = document.getElementById('warp-toast');
+  document.getElementById('warp-target').textContent = p.name;
+  toast.classList.add('show');
+
+  // Zoom in (use current rotated position)
+  const pos = getPlanetWorldPos(p);
+  camera.targetX = pos.x;
+  camera.targetY = pos.y;
+  camera.targetZoom = 3.5;
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    openPlanetView(id);
+    // Fade tunnel slightly after planet view opens
+    setTimeout(() => {
+      tunnel.classList.remove('active');
+    }, 300);
+  }, 1000);
+}
+
+// =====================================================================
+// PLANET DETAIL VIEW
+// =====================================================================
+function openPlanetView(id) {
+  const p = PLANETS.find(x => x.id === id);
+  if (!p) return;
+
+  const view = document.getElementById('planet-view');
+  const inner = document.getElementById('planet-view-inner');
+  document.body.classList.add('in-planet');
+
+  inner.style.setProperty('--planet-color', p.color);
+  inner.innerHTML = buildPlanetHTML(p);
+
+  // Setup disconnect
+  inner.querySelector('.btn-disconnect').addEventListener('click', closePlanetView);
+
+  // Wire host-pick buttons (INHABITANTS view)
+  inner.querySelectorAll('.host-pick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openHostView(btn.dataset.host);
+    });
+  });
+
+  view.classList.add('open');
+  view.classList.add('opening');
+  setTimeout(() => view.classList.remove('opening'), 600);
+  view.scrollTo(0, 0);
+}
+
+function closePlanetView() {
+  const view = document.getElementById('planet-view');
+  view.classList.remove('open');
+  document.body.classList.remove('in-planet');
+  deselectPlanet();
+}
+
+function buildPlanetHTML(p) {
+  let body = '';
+  if (p.id === 'unregulated') body = buildUnregulatedHTML();
+  else if (p.id === 'talkshow') body = buildTalkshowHTML();
+  else if (p.id === 'daily') body = buildDailyHTML();
+  else if (p.id === 'planet-geek') body = buildPlanetGeekHTML();
+  else if (p.id === 'inhabitants') body = buildInhabitantsHTML();
+  else if (p.id === 'spectators') body = buildSpectatorsHTML();
+  else if (p.id === 'pitch') body = buildPitchHTML();
+
+  return `
+    <div class="pv-header">
+      <div class="pv-breadcrumb">
+        <span>// UNIVERSE</span>
+        <span class="arrow">▸</span>
+        <span>${p.short}</span>
+      </div>
+      <button class="btn-disconnect"><span class="icon">✕</span> DISCONNECT</button>
+    </div>
+
+    <div class="pv-title-block">
+      <div class="pv-eyebrow">${p.tier}</div>
+      <h1 class="pv-title">${p.name.includes(p.short) ? p.name.replace(p.short, `<span class="accent">${p.short}</span>`) : `<span class="accent">${p.name}</span>`}</h1>
+      <p class="pv-lead">${p.desc}</p>
+    </div>
+
+    ${body}
+  `;
+}
+
+// =====================================================================
+// HOST DETAIL VIEW (sub-page accessed via INHABITANTS)
+// =====================================================================
+function openHostView(hostId) {
+  const h = HOSTS.find(x => x.id === hostId);
+  if (!h) return;
+  const view = document.getElementById('planet-view');
+  const inner = document.getElementById('planet-view-inner');
+  inner.style.setProperty('--planet-color', h.color);
+  inner.innerHTML = buildHostFullHTML(h);
+  inner.querySelector('.btn-disconnect').addEventListener('click', () => {
+    // Go back to inhabitants overview
+    openPlanetView('inhabitants');
+    document.getElementById('planet-view').scrollTo(0, 0);
+  });
+  inner.querySelectorAll('.btn-disconnect-galaxy').forEach(b => b.addEventListener('click', closePlanetView));
+  view.classList.add('opening');
+  setTimeout(() => view.classList.remove('opening'), 600);
+  view.scrollTo(0, 0);
+}
+
+function buildHostFullHTML(p) {
+  const statsHTML = p.stats.map(s => `
+    <div class="stat-row">
+      <div class="lbl">${s.lbl}</div>
+      <div class="val">${s.val} <span class="stat-bar" style="width:${s.bar}px"></span></div>
+    </div>
+  `).join('');
+  const skillsHTML = p.skills.map(s => `<li>${s}</li>`).join('');
+
+  return `
+    <div class="pv-header">
+      <div class="pv-breadcrumb">
+        <span>// UNIVERSE</span>
+        <span class="arrow">▸</span>
+        <span>INHABITANTS</span>
+        <span class="arrow">▸</span>
+        <span>${p.short}</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-disconnect">← INHABITANTS</button>
+        <button class="btn-disconnect btn-disconnect-galaxy"><span class="icon">✕</span> GALAXY</button>
+      </div>
+    </div>
+
+    <div class="pv-title-block">
+      <div class="pv-eyebrow">${p.tier}</div>
+      <h1 class="pv-title"><span class="accent">${p.short}</span></h1>
+      <p class="pv-lead">${p.desc}</p>
+    </div>
+
+    <div class="host-hero">
+      <div class="host-portrait">
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+        <img src="${p.img}" alt="${p.short}">
+        <div class="scan"></div>
+        <div class="badges">
+          <div class="host-badge">LV. 99</div>
+          <div class="host-badge right">CLASS: ${p.class.split(' ').slice(-1)[0].toUpperCase()}</div>
+        </div>
+      </div>
+      <div class="host-data">
+        <div class="name-block">
+          <div class="class">${p.class}</div>
+          <div class="name">${p.short}</div>
+          <div class="tag">${p.tag}</div>
+        </div>
+        <div class="stat-grid">${statsHTML}</div>
+      </div>
+    </div>
+
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// SKILLS</div>
+        <h3>Signature Moves</h3>
+        <ul class="skill-list">${skillsHTML}</ul>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// LORE</div>
+        <h3>Weapon &amp; Quote</h3>
+        <p><b style="color:var(--cream)">Wapen:</b> ${p.weapon}</p>
+        <div class="quote">${p.quote}</div>
+        <p style="margin-top:18px"><b style="color:var(--cream)">Trivia:</b> ${p.trivia}</p>
+      </div>
+    </div>
+  `;
+}
+
+// =====================================================================
+// INHABITANTS — host selection screen
+// =====================================================================
+function buildInhabitantsHTML() {
+  const cards = HOSTS.map(h => `
+    <button class="host-pick" data-host="${h.id}" style="--host-color: ${h.color}; --host-glow: ${h.glow}">
+      <div class="host-pick-bg"></div>
+      <img src="${h.img}" alt="${h.short}" class="host-pick-img">
+      <div class="host-pick-info">
+        <div class="host-pick-class">${h.class}</div>
+        <div class="host-pick-name">${h.short}</div>
+        <div class="host-pick-tag">${h.tag}</div>
+        <div class="host-pick-cta">► SELECT</div>
+      </div>
+    </button>
+  `).join('');
+
+  return `<div class="host-pick-grid">${cards}</div>`;
+}
+
+// =====================================================================
+// GEEKS UNREGULATED — de podcast
+// =====================================================================
+function buildUnregulatedHTML() {
+  return `
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// FORMAT · 60 MIN</div>
+        <h3>Eén uur, vaste structuur</h3>
+        <ul class="format-list">
+          <li><span class="key">Main Quest</span><span class="val">Wat speelt in de scene of in onze Discords. De aanleiding van de aflevering.</span></li>
+          <li><span class="key">Side Quest</span><span class="val">Iemand brengt een hot take, obscure serie of gênant verhaal mee.</span></li>
+          <li><span class="key">Weeklies</span><span class="val">Wat we spelen, kijken, lezen (of beloven te doen).</span></li>
+          <li><span class="key">Challenge Mode</span><span class="val">Eén kiest een game die de anderen móéten spelen, streamen op Twitch. Volgende keer faillure-debrief.</span></li>
+          <li><span class="key">Final Boss</span><span class="val">Soms — een gevoelig discussiepunt waar het écht spannend wordt.</span></li>
+        </ul>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// BROADCAST INFRA</div>
+        <h3>Where &amp; When</h3>
+        <p><b style="color:var(--cream)">Twitch:</b> live streams van Challenge Mode + community moments. 2–3× per week.</p>
+        <p><b style="color:var(--cream)">Podcast feeds:</b> audio-release op alle platformen (Spotify / Apple / YouTube).</p>
+        <p><b style="color:var(--cream)">TikTok &amp; IG Reels:</b> momenten en hot takes uit de vodcast als korte clips.</p>
+        <p><b style="color:var(--cream)">Frequentie:</b> wekelijkse vodcast-cadans + live moments tussendoor.</p>
+        <p style="margin-top: 16px; color: var(--orange); font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.2em;">// THE ANTI-POLISHED ONE</p>
+      </div>
+    </div>
+
+    <div class="pv-card" style="margin-bottom: 40px;">
+      <div class="card-eyebrow">// DNA</div>
+      <h3>Geen script. Wel structuur.</h3>
+      <p>Unregulated is geen TV. Het is een ruimte waar de drie hun mening écht kunnen vormen, in real time, met de community erbij. De structuur is de drager, het gesprek is het hart. <b style="color:var(--orange)">Dit is waar we ons het minst gepolijst kunnen permitteren.</b></p>
+    </div>
+  `;
+}
+
+// =====================================================================
+// GEEKS TALKSHOW — VRT MAX videoreeks
+// =====================================================================
+function buildTalkshowHTML() {
+  return `
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// CONCEPT · V3</div>
+        <h3>One host. Two friends. Mee in de wereld.</h3>
+        <p>Per aflevering neemt één host de andere twee mee in zijn eigen geek-wereld. Vlog-achtige stijl, dichter bij creator-content dan bij klassieke EFP.</p>
+        <ul class="format-list" style="margin-top: 14px;">
+          <li><span class="key">Start</span><span class="val">Host kondigt zijn wereld aan vanuit de geek-hub.</span></li>
+          <li><span class="key">Mee erin</span><span class="val">Samen iets doen — een game spelen, een collectie bekijken, iets bouwen.</span></li>
+          <li><span class="key">Op pad</span><span class="val">Naar een event, beurs, conventie of community-plek waar de cultuur leeft.</span></li>
+          <li><span class="key">Terugblik</span><span class="val">Terug in de hub. Wat blijft hangen, wat veranderde, wat is de take?</span></li>
+        </ul>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// STATUS</div>
+        <h3>Piloot in evaluatie</h3>
+        <p><b style="color:var(--cream)">Platform:</b> VRT MAX (online videoreeks)</p>
+        <p><b style="color:var(--cream)">Productiepartner:</b> VRT Studio's Creatieve Cel — Anton Beyens als trekker, Hannes Demuynck productie.</p>
+        <p><b style="color:var(--cream)">Piloot:</b> opgenomen 25/03/2026 · ontvangen 16/04/2026 · feedback binnen.</p>
+        <p><b style="color:var(--cream)">Volgende stap:</b> reeks-bestelling. Anton: "jullie spatten van het scherm." Gino: "zeer vrolijk, goeie dynamiek."</p>
+      </div>
+    </div>
+
+    <div class="pv-card">
+      <div class="card-eyebrow">// CONCEPT-EVOLUTIE</div>
+      <h3>Hoe we hier kwamen</h3>
+      <p><b style="color:var(--magenta)">V1 (SNL-stijl):</b> variety show met desk, monologue, Geek Court, Lie Detector. Té veel rolletjes.</p>
+      <p><b style="color:var(--magenta)">V2 (Hub-format):</b> sketches en sets per wereld. Feedback Gino: "liever in een kast kruipen dan ruimte te groot maken."</p>
+      <p><b style="color:var(--magenta)">V3 (Back to basics):</b> één host neemt de andere twee mee in zijn geek-wereld. Vlog/creator-aanpak, vaste hub, op pad naar events. <b style="color:var(--cream)">Dít is wat doorging.</b></p>
+    </div>
+  `;
+}
+
+// =====================================================================
+// GEEKS DAILY — korte content
+// =====================================================================
+function buildDailyHTML() {
+  return `
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// FORMAT</div>
+        <h3>Snel. Snackable. Dagelijks.</h3>
+        <p>Korte geek-content op de socials. Vertical video, één van de drie aan het woord, soms allemaal. Reacties, hot takes, news drops, recensies in 30 seconden.</p>
+        <p>De plek waar het universum élke dag leeft, ook tussen vodcast-afleveringen door.</p>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// PLATFORMS</div>
+        <h3>Where it drops</h3>
+        <p><b style="color:var(--cream)">TikTok:</b> primary canal voor daily drops.</p>
+        <p><b style="color:var(--cream)">Instagram Reels:</b> cross-post + behind-the-scenes.</p>
+        <p><b style="color:var(--cream)">YouTube Shorts:</b> reach buiten de TikTok-bubble.</p>
+        <p><b style="color:var(--cream)">Frequentie:</b> 5× per week ofwel élke werkdag een drop.</p>
+      </div>
+    </div>
+
+    <div class="pv-card">
+      <div class="card-eyebrow">// CONTENT TYPES</div>
+      <h3>Wat we daar doen</h3>
+      <ul class="skill-list" style="--planet-color: var(--cyan);">
+        <li><b>News Drops</b> — nieuwe game-releases, anime-aankondigingen, hardware reveals</li>
+        <li><b>Hot Takes</b> — één van de drie geeft een mening van 30 seconden over iets actueels</li>
+        <li><b>Reacties</b> — eerste indrukken van trailers, episode 1's, controversies</li>
+        <li><b>Recommendations</b> — "speel dit / kijk dit / lees dit", met reden in één zin</li>
+        <li><b>Behind the Scenes</b> — wat er gebeurt tussen vodcast en talkshow door</li>
+      </ul>
+    </div>
+  `;
+}
+
+// =====================================================================
+// PLANEET GEEK — missie/visie
+// =====================================================================
+function buildPlanetGeekHTML() {
+  return `
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// MISSIE</div>
+        <h3>Wat we doen</h3>
+        <p>Geek culture is mainstream geworden, maar in België blijft de zichtbaarheid versnipperd. Losse events, kleine communities, geïmporteerde formats. <b style="color:var(--green)">Géén platform brengt het samen.</b></p>
+        <p>Wij bouwen dat platform. Geen import. Geen vertaling van wat er elders al is. Een Belgische plek voor Belgische geeks, in alle talen die hier gesproken worden.</p>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// VISIE</div>
+        <h3>Waar we naartoe gaan</h3>
+        <p>Hét Belgische platform waar geeks zich thuis voelen en eindelijk gezien worden — een bruisende community, online én offline.</p>
+        <p>Geen import. Geen vertaling van wat elders al bestaat. Een eigen Belgische plek voor geek culture, in alle talen die hier gesproken worden.</p>
+      </div>
+    </div>
+
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// DEFINITIE</div>
+        <h3>Wat is een geek?</h3>
+        <p>Iemand die diep in een wereld duikt — games, films, series, manga, technologie — en daar méér in ziet dan alleen ontspanning. Het gaat niet om niche of genre, maar om <b style="color:var(--green)">passie en betrokkenheid</b>.</p>
+        <p>Anime, comics, DnD, cosplay, TCGs, K-pop, streaming, fandom, collecting, boeken, board games, videogames. Het is allemaal welkom.</p>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// VOOR WIE</div>
+        <h3>Onze mensen</h3>
+        <p>Geeks die nooit herkenning voelden in de mainstream. Stemmen die genegeerd worden. Mensen die hun passie niet willen uitleggen of verantwoorden. Community bóven performen.</p>
+        <div class="quote" style="border-color: var(--green)">"Wij maken het zichtbaar — voor wie het altijd al was."</div>
+      </div>
+    </div>
+  `;
+}
+
+// =====================================================================
+// SPECTATORS — tribes (de doelgroep)
+// =====================================================================
+function buildSpectatorsHTML() {
+  const cards = TRIBES.map(t => `
+    <div class="tribe-card" style="--tribe-color: ${t.color}; --tribe-tint: ${t.tint}">
+      <div class="head">
+        <div>
+          <div class="id">// GUILD ${t.id}</div>
+          <div class="name">${t.name}</div>
+        </div>
+        <div class="age">${t.age}</div>
+      </div>
+      <p class="desc">${t.desc}</p>
+      <div class="quote">${t.quote}</div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="tribes-grid">${cards}</div>
+
+    <div class="pv-card" style="margin-top: 40px;">
+      <div class="card-eyebrow">// PRINCIPE</div>
+      <h3>Geen hiërarchie. Geen gatekeeping.</h3>
+      <p>De vier stammen zijn geen niveaus. Geen "true geek vs casual". Je kan in meerdere stammen vallen, je kan kantelen tussen ze, je kan ze allemaal tegelijk zijn. Het idee is: zichtbaarheid voor élke manier waarop mensen geek zijn — niet alleen de manier die in de mainstream wordt afgebeeld.</p>
+    </div>
+  `;
+}
+
+// =====================================================================
+// THE PITCH — data + story
+// =====================================================================
+function buildPitchHTML() {
+  return `
+    <div class="pv-card" style="margin-bottom: 40px;">
+      <div class="card-eyebrow">// HET MOMENT</div>
+      <h3>Waarom nu</h3>
+      <p>Geek culture is in België allang geen niche meer — maar wordt nog wel zo behandeld. Geïmporteerde formats, versnipperde communities, zero Belgische platforms die het samenbrengen. De cijfers vertellen het verhaal:</p>
+    </div>
+
+    <div class="data-grid">
+      <div class="data-card">
+        <div class="lbl">// WEKELIJKSE GAMERS</div>
+        <div class="num">48<span class="unit">%</span></div>
+        <div class="desc">van Belgen gamet wekelijks. Bij 18–34 is dat <b style="color:var(--gold)">69%</b>.</div>
+      </div>
+      <div class="data-card">
+        <div class="lbl">// VROUWELIJKE GAMERS</div>
+        <div class="num">1<span class="unit"> op 3</span></div>
+        <div class="desc">vrouwen identificeert zich als gamer. De "boys only" narratief klopt al lang niet meer.</div>
+      </div>
+      <div class="data-card">
+        <div class="lbl">// TWITCH KIJKERS BE</div>
+        <div class="num">1.1<span class="unit">M</span></div>
+        <div class="desc">Belgen kijken minstens maandelijks Twitch. Eigen Belgische content blijft achter.</div>
+      </div>
+      <div class="data-card">
+        <div class="lbl">// IDENTITEIT</div>
+        <div class="num">60<span class="unit">%</span></div>
+        <div class="desc">van 16–30 zegt dat geek culture deel uitmaakt van hun identiteit.</div>
+      </div>
+      <div class="data-card">
+        <div class="lbl">// MANGA</div>
+        <div class="num">#1</div>
+        <div class="desc">snelst groeiende boekensegment in België. Stilletjes mainstream geworden.</div>
+      </div>
+      <div class="data-card">
+        <div class="lbl">// ANIME vs NETFLIX</div>
+        <div class="num">&gt;</div>
+        <div class="desc">Anime heeft <b style="color:var(--gold)">hogere zoekinteresse</b> dan Netflix Originals bij 16–29.</div>
+      </div>
+    </div>
+
+    <div class="pv-card">
+      <div class="card-eyebrow">// CONCLUSIE</div>
+      <h3>Community &gt; Content</h3>
+      <p>Geek culture is geen niche meer. Het is mainstream. Maar in België is het versnipperd en onzichtbaar gemaakt — alsof het nog steeds van een kleine groep is. <b style="color:var(--cream)">Wij bouwen geen content. We bouwen de community waar die content rond verzamelt.</b></p>
+      <p style="margin-top: 16px;">Dat begint bij <b style="color:var(--orange)">één plek</b> waar geeks zich herkennen — in de stem, in de styling, in de mensen die het maken. Online én offline.</p>
+    </div>
+  `;
+}
+
+// =====================================================================
+// MOUSE / TOUCH CONTROLS
+// =====================================================================
+let isDragging = false;
+let dragStart = { x: 0, y: 0, camX: 0, camY: 0 };
+
+const viewport = document.querySelector('.galaxy-viewport');
+
+viewport.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.planet') || e.target.closest('.geeks-core')) return;
+  isDragging = true;
+  dragStart.x = e.clientX;
+  dragStart.y = e.clientY;
+  dragStart.camX = camera.targetX;
+  dragStart.camY = camera.targetY;
+  document.body.classList.add('grabbing');
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const dx = (e.clientX - dragStart.x) / camera.zoom;
+  const dy = (e.clientY - dragStart.y) / camera.zoom;
+  camera.targetX = dragStart.camX - dx;
+  camera.targetY = dragStart.camY - dy;
+  // Bring camera position close to target instantly during drag
+  camera.x = camera.targetX;
+  camera.y = camera.targetY;
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  document.body.classList.remove('grabbing');
+});
+
+// Touch support
+viewport.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.planet') || e.target.closest('.geeks-core')) return;
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragStart.x = e.touches[0].clientX;
+    dragStart.y = e.touches[0].clientY;
+    dragStart.camX = camera.targetX;
+    dragStart.camY = camera.targetY;
+  }
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+  if (!isDragging || e.touches.length !== 1) return;
+  const dx = (e.touches[0].clientX - dragStart.x) / camera.zoom;
+  const dy = (e.touches[0].clientY - dragStart.y) / camera.zoom;
+  camera.targetX = dragStart.camX - dx;
+  camera.targetY = dragStart.camY - dy;
+  camera.x = camera.targetX;
+  camera.y = camera.targetY;
+}, { passive: true });
+
+window.addEventListener('touchend', () => { isDragging = false; });
+
+// Zoom on wheel
+viewport.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = -e.deltaY * 0.001;
+  const newZoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.targetZoom + delta * camera.targetZoom));
+  camera.targetZoom = newZoom;
+}, { passive: false });
+
+// Click empty space → deselect
+viewport.addEventListener('click', (e) => {
+  if (e.target.closest('.planet') || e.target.closest('.geeks-core')) return;
+  if (selectedId) deselectPlanet();
+});
+
+// Keyboard
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('crew-manifest').classList.contains('open')) {
+      closeCrewManifest();
+    } else if (document.getElementById('planet-view').classList.contains('open')) {
+      closePlanetView();
+    } else if (currentScene === 'media') {
+      exitMediaHub();
+    } else if (selectedId) {
+      deselectPlanet();
+    }
+  }
+  if (e.key.toLowerCase() === 'r') {
+    deselectPlanet();
+  }
+});
+
+// =====================================================================
+// SCENE SWITCH — main galaxy ↔ media sub-galaxy
+// =====================================================================
+function enterMediaHub() {
+  if (currentScene === 'media') return;
+  // 1. zoom-in toward MEDIA planet first
+  const u = document.querySelector('.universe');
+  const mediaPlanet = document.querySelector('.planet[data-id="media"]');
+  if (mediaPlanet) {
+    // get planet's world position
+    const rect = mediaPlanet.getBoundingClientRect();
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const dx = (rect.left + rect.width / 2) - cx;
+    const dy = (rect.top + rect.height / 2) - cy;
+    camera.targetX = -dx / camera.zoom;
+    camera.targetY = -dy / camera.zoom;
+    camera.targetZoom = 2.2;
+  }
+  setTimeout(() => {
+    // 2. fade out
+    u.classList.add('scene-fading');
+    u.classList.add('scene-zooming-in');
+    setTimeout(() => {
+      // 3. switch scene
+      currentScene = 'media';
+      document.body.setAttribute('data-scene', 'media');
+      // reset camera
+      camera.x = 0; camera.y = 0;
+      camera.targetX = 0; camera.targetY = 0;
+      camera.zoom = IS_MOBILE ? 0.7 : 0.5;
+      camera.targetZoom = IS_MOBILE ? 1.15 : 0.85;
+      // rebuild nav
+      rebuildNav();
+      // 4. fade in
+      u.classList.remove('scene-zooming-in');
+      u.classList.add('scene-zooming-out');
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          u.classList.remove('scene-fading');
+          u.classList.remove('scene-zooming-out');
+          // clear selection
+          deselectPlanet();
+        }, 50);
+      });
+    }, 450);
+  }, 700);
+}
+
+function exitMediaHub() {
+  if (currentScene === 'main') return;
+  const u = document.querySelector('.universe');
+  // zoom out animation
+  u.classList.add('scene-fading');
+  u.classList.add('scene-zooming-out');
+  setTimeout(() => {
+    currentScene = 'main';
+    document.body.setAttribute('data-scene', 'main');
+    camera.x = 0; camera.y = 0;
+    camera.targetX = 0; camera.targetY = 0;
+    camera.zoom = 1.5;
+    camera.targetZoom = _INIT_ZOOM;
+    rebuildNav();
+    u.classList.remove('scene-zooming-out');
+    u.classList.add('scene-zooming-in');
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        u.classList.remove('scene-fading');
+        u.classList.remove('scene-zooming-in');
+        deselectPlanet();
+      }, 50);
+    });
+  }, 450);
+}
+
+document.getElementById('btn-exit-hub').addEventListener('click', exitMediaHub);
+
+function rebuildNav() {
+  navList.innerHTML = '';
+  const scenePlanets = PLANETS.filter(p => p.scene === currentScene);
+  if (currentScene === 'main') {
+    const label = document.createElement('div');
+    label.className = 'nav-section-label';
+    label.innerHTML = '// MAIN GALAXY';
+    navList.appendChild(label);
+  } else {
+    const label = document.createElement('div');
+    label.className = 'nav-section-label';
+    label.innerHTML = '// MEDIA HUB · 3 PROPERTIES';
+    navList.appendChild(label);
+  }
+  scenePlanets.forEach(p => navList.appendChild(makeNavItem(p)));
+}
+
+// =====================================================================
+// CORE CLICK — scene-aware
+// =====================================================================
+function openCrewManifest() {
+  const cm = document.getElementById('crew-manifest');
+  cm.classList.add('open');
+  cm.classList.add('opening');
+  document.body.classList.add('in-planet');
+  setTimeout(() => cm.classList.remove('opening'), 700);
+}
+function closeCrewManifest() {
+  document.getElementById('crew-manifest').classList.remove('open');
+  if (!document.getElementById('planet-view').classList.contains('open')) {
+    document.body.classList.remove('in-planet');
+  }
+}
+
+document.querySelector('.geeks-core').addEventListener('click', () => {
+  // In main scene: open crew manifest
+  // In media sub-galaxy: clicking the center "Geeks" opens Planeet Geek (missie)
+  if (currentScene === 'media') {
+    selectPlanet('planet-geek-virtual');
+    setTimeout(() => openPlanetView('planet-geek'), 300);
+  } else {
+    openCrewManifest();
+  }
+});
+document.getElementById('cm-close-btn').addEventListener('click', closeCrewManifest);
+
+// =====================================================================
+// LANDING PAGE — explore the universe
+// =====================================================================
+const landingCta = document.getElementById('landing-cta');
+landingCta.addEventListener('click', () => {
+  document.getElementById('landing').classList.add('done');
+});
+
+// Re-open intro from HUD
+document.getElementById('btn-intro-reopen').addEventListener('click', () => {
+  document.getElementById('landing').classList.remove('done');
+  document.getElementById('landing').scrollTo(0, 0);
+});
+
+// Start camera animation loop AFTER all init complete (so minimapDots etc exist)
+animateCamera();
+
+// Allow Enter to also start exploring
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    const landing = document.getElementById('landing');
+    if (landing && !landing.classList.contains('done')) {
+      e.preventDefault();
+      landing.classList.add('done');
+    }
+  }
+});
+
+</script>
+
+</body>
+</html>
