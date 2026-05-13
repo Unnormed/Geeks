@@ -2789,10 +2789,13 @@
 // =====================================================================
 const GeeksAudio = (() => {
   const STORAGE_KEY = 'geeks-sound-muted';
+  const LOOKAHEAD = 0.025; // 25ms — fixes iOS first-sound-missing while ctx.resume() resolves
   let ctx = null;
   let master = null;
+  let sfxBus = null;
+  let ambientBus = null;
   let ambientStarted = false;
-  let ambientGain = null;
+  let arpTimer = null;
   let muted = localStorage.getItem(STORAGE_KEY) === '1';
 
   function ensureCtx() {
@@ -2803,64 +2806,119 @@ const GeeksAudio = (() => {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 1;
     master.connect(ctx.destination);
+    // Sub-buses so SFX and ambient have independent headroom
+    sfxBus = ctx.createGain();
+    sfxBus.gain.value = 1.0;
+    sfxBus.connect(master);
+    ambientBus = ctx.createGain();
+    ambientBus.gain.value = 0; // ramped up by startAmbient
+    ambientBus.connect(master);
   }
 
   function resumeIfNeeded() {
-    if (ctx && ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
   }
 
+  // ---------- AMBIENT — lo-fi Final Fantasy town/world vibe ----------
+  // Layers: deep bass pad + Asus2 chord pad + bell-like arpeggio melody
   function startAmbient() {
     ensureCtx();
     if (!ctx || ambientStarted) return;
     resumeIfNeeded();
     ambientStarted = true;
 
-    // Master ambient bus — fade in over 4s so it's never abrupt
-    ambientGain = ctx.createGain();
-    ambientGain.gain.value = 0;
-    ambientGain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 4);
+    // Fade ambient bus in over 4s
+    ambientBus.gain.cancelScheduledValues(ctx.currentTime);
+    ambientBus.gain.setValueAtTime(0, ctx.currentTime);
+    ambientBus.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 4);
 
-    // Lowpass + slow LFO so the timbre breathes
+    // --- Pad layer: detuned triangle voices through lowpass with slow LFO ---
+    const padBus = ctx.createGain();
+    padBus.gain.value = 0.16;
+
     const lpf = ctx.createBiquadFilter();
     lpf.type = 'lowpass';
-    lpf.frequency.value = 700;
-    lpf.Q.value = 0.6;
+    lpf.frequency.value = 900;
+    lpf.Q.value = 0.7;
 
     const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.05;
+    lfo.frequency.value = 0.06;
     const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 220;
+    lfoGain.gain.value = 280;
     lfo.connect(lfoGain).connect(lpf.frequency);
     lfo.start();
 
-    // Open Asus2 cluster — A1, E2, A2, B2 (cosmic / open / not too major-or-minor)
-    const voices = [
-      { f: 55,    g: 0.32, type: 'sine'     },
-      { f: 82.41, g: 0.24, type: 'sine'     },
-      { f: 110,   g: 0.18, type: 'sine'     },
-      { f: 123.47,g: 0.08, type: 'triangle' },
+    // A minor / Asus2 cluster — open and FF-ish (A, E, A, B, C#5 fifth)
+    const padVoices = [
+      { f: 55,    g: 0.30, type: 'triangle' },
+      { f: 82.41, g: 0.22, type: 'triangle' },
+      { f: 110,   g: 0.18, type: 'triangle' },
+      { f: 123.47,g: 0.10, type: 'triangle' },
+      { f: 164.81,g: 0.06, type: 'sine'     },
     ];
-    voices.forEach((v, i) => {
+    padVoices.forEach((v, i) => {
       const osc = ctx.createOscillator();
       osc.type = v.type;
       osc.frequency.value = v.f;
-      osc.detune.value = (i - 1.5) * 5;
+      osc.detune.value = (i - 2) * 6;
       const g = ctx.createGain();
       g.gain.value = v.g;
       osc.connect(g).connect(lpf);
       osc.start();
     });
+    lpf.connect(padBus).connect(ambientBus);
 
-    // High shimmer sine for cosmic sparkle
-    const shimmer = ctx.createOscillator();
-    shimmer.type = 'sine';
-    shimmer.frequency.value = 659.25;
-    const shimmerGain = ctx.createGain();
-    shimmerGain.gain.value = 0.03;
-    shimmer.connect(shimmerGain).connect(ambientGain);
-    shimmer.start();
+    // --- Tape-flutter feel: tiny vibrato on the whole pad via gain LFO ---
+    const flutter = ctx.createOscillator();
+    flutter.frequency.value = 0.4;
+    const flutterAmt = ctx.createGain();
+    flutterAmt.gain.value = 0.02;
+    flutter.connect(flutterAmt).connect(padBus.gain);
+    flutter.start();
 
-    lpf.connect(ambientGain).connect(master);
+    // --- Bell arpeggio: triangle blips with long decay over the pad ---
+    // FF-style ostinato in A minor pentatonic
+    const arpNotes = [
+      659.25,  // E5
+      880.00,  // A5
+      987.77,  // B5
+      1318.51, // E6
+      987.77,  // B5
+      880.00,  // A5
+      659.25,  // E5
+      523.25,  // C5
+    ];
+    let arpIdx = 0;
+    const arpDelay = ctx.createDelay(1.2);
+    arpDelay.delayTime.value = 0.36; // sixteenth-ish at our tempo
+    const arpFeedback = ctx.createGain();
+    arpFeedback.gain.value = 0.32;
+    const arpBus = ctx.createGain();
+    arpBus.gain.value = 0.55;
+    arpDelay.connect(arpFeedback).connect(arpDelay);
+    arpDelay.connect(arpBus).connect(ambientBus);
+
+    function playArpNote() {
+      if (!ctx || muted) { /* still keep timer running */ }
+      const t = ctx.currentTime;
+      const f = arpNotes[arpIdx % arpNotes.length];
+      arpIdx++;
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0, t);
+      og.gain.linearRampToValueAtTime(0.10, t + 0.02);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+      o.connect(og);
+      og.connect(arpBus);
+      og.connect(arpDelay); // echo trail
+      o.start(t);
+      o.stop(t + 1.7);
+    }
+    // Slow tempo — every 900ms = about 67 BPM, dreamy FF town pace
+    arpTimer = setInterval(playArpNote, 900);
+    playArpNote();
   }
 
   function setMuted(v) {
@@ -2872,44 +2930,69 @@ const GeeksAudio = (() => {
       master.gain.setValueAtTime(master.gain.value, now);
       master.gain.linearRampToValueAtTime(muted ? 0 : 1, now + 0.18);
     }
-    // First unmute counts as user gesture — start ambient if not yet started
     if (!muted && !ambientStarted) startAmbient();
     updateToggleUI();
   }
   function toggleMuted() { setMuted(!muted); }
   function isMuted() { return muted; }
 
-  // ---- SFX ----
-  function blip({ freq = 660, freq2 = null, type = 'square', dur = 0.08, gain = 0.12, attack = 0.005 } = {}) {
+  // ---------- SFX engine ----------
+  // tone: one note with pitch envelope, runs through sfxBus (loud, clear)
+  function tone({ freq, freq2 = null, type = 'square', dur = 0.10, gain = 0.25, attack = 0.005, delay = 0 } = {}) {
     if (!ctx || muted) return;
-    const now = ctx.currentTime;
+    const startAt = ctx.currentTime + LOOKAHEAD + delay;
+    const endAt = startAt + dur;
     const osc = ctx.createOscillator();
     osc.type = type;
-    osc.frequency.setValueAtTime(freq, now);
+    osc.frequency.setValueAtTime(freq, startAt);
     if (freq2 !== null) {
-      try { osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq2), now + dur); }
-      catch (e) { osc.frequency.linearRampToValueAtTime(freq2, now + dur); }
+      try { osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq2), endAt); }
+      catch (e) { osc.frequency.linearRampToValueAtTime(freq2, endAt); }
     }
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(gain, now + attack);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    osc.connect(g).connect(master);
-    osc.start(now);
-    osc.stop(now + dur + 0.02);
+    g.gain.setValueAtTime(0.0001, startAt);
+    g.gain.exponentialRampToValueAtTime(gain, startAt + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, endAt);
+    osc.connect(g).connect(sfxBus);
+    osc.start(startAt);
+    osc.stop(endAt + 0.03);
   }
 
-  function playClick()  { ensureCtx(); resumeIfNeeded(); blip({ freq: 660, freq2: 880,  type: 'square',   dur: 0.06, gain: 0.10 }); }
-  function playSelect() { ensureCtx(); resumeIfNeeded(); blip({ freq: 880, freq2: 1100, type: 'triangle', dur: 0.09, gain: 0.11 }); }
-  function playBack()   { ensureCtx(); resumeIfNeeded(); blip({ freq: 660, freq2: 220,  type: 'square',   dur: 0.14, gain: 0.10 }); }
-  function playHover()  { ensureCtx(); resumeIfNeeded(); blip({ freq: 1320,freq2: 1480, type: 'sine',     dur: 0.03, gain: 0.04 }); }
-  function playWarp()   {
+  function playClick() {
     ensureCtx(); resumeIfNeeded();
-    blip({ freq: 220, freq2: 880,  type: 'sawtooth', dur: 0.30, gain: 0.09 });
-    setTimeout(() => blip({ freq: 440, freq2: 1320, type: 'triangle', dur: 0.22, gain: 0.07 }), 35);
+    tone({ freq: 880, freq2: 1175, type: 'square', dur: 0.07, gain: 0.22 });
+  }
+  function playSelect() {
+    // FF menu select: two-tone "di-ding"
+    ensureCtx(); resumeIfNeeded();
+    tone({ freq: 988,  type: 'square', dur: 0.05, gain: 0.22 });
+    tone({ freq: 1319, type: 'square', dur: 0.10, gain: 0.24, delay: 0.05 });
+  }
+  function playBack() {
+    // Cancel sound: downward sweep, classic FF cancel
+    ensureCtx(); resumeIfNeeded();
+    tone({ freq: 660, freq2: 220, type: 'square', dur: 0.16, gain: 0.22 });
+  }
+  function playHover() {
+    ensureCtx(); resumeIfNeeded();
+    tone({ freq: 1568, freq2: 1760, type: 'triangle', dur: 0.04, gain: 0.10 });
+  }
+  // FF-style warp/teleport: chord stab + rising sweep + bright finishing chime
+  function playWarp() {
+    ensureCtx(); resumeIfNeeded();
+    // 1) chord stab (A minor: A + C + E)
+    tone({ freq: 220,    type: 'square',   dur: 0.10, gain: 0.20 });
+    tone({ freq: 261.63, type: 'square',   dur: 0.10, gain: 0.16 });
+    tone({ freq: 329.63, type: 'square',   dur: 0.10, gain: 0.16 });
+    // 2) rising sweep — the actual "whoosh"
+    tone({ freq: 330, freq2: 1760, type: 'square',   dur: 0.45, gain: 0.22, delay: 0.10 });
+    tone({ freq: 660, freq2: 2200, type: 'triangle', dur: 0.45, gain: 0.18, delay: 0.12 });
+    // 3) finishing chime
+    tone({ freq: 2349, freq2: 2637, type: 'triangle', dur: 0.22, gain: 0.22, delay: 0.55 });
+    tone({ freq: 1760, freq2: 1976, type: 'triangle', dur: 0.22, gain: 0.18, delay: 0.55 });
   }
 
-  // ---- Toggle UI ----
+  // ---------- Toggle UI ----------
   function updateToggleUI() {
     const btn = document.getElementById('sound-toggle');
     const lbl = document.getElementById('sound-toggle-lbl');
