@@ -1401,13 +1401,12 @@
     display: none;
     opacity: 0;
     transition: opacity 0.5s;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .crew-manifest.open {
-    display: flex;
+    display: block;
     opacity: 1;
-    align-items: center;
-    justify-content: center;
   }
   .crew-manifest.opening {
     animation: warp-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -1415,12 +1414,44 @@
   .cm-stage {
     position: relative;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 60px;
+    padding: 90px 60px 60px;
+    box-sizing: border-box;
+  }
+  /* Always-visible disconnect button at top-right */
+  .cm-disconnect {
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    z-index: 5;
+    background: rgba(5, 0, 16, 0.7);
+    border: 1px solid var(--red);
+    color: var(--red);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.25em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .cm-disconnect:hover {
+    background: var(--red);
+    color: var(--cream);
+  }
+  .cm-disconnect .icon { font-size: 14px; }
+  @media (max-width: 700px) {
+    .cm-disconnect { top: 12px; right: 12px; padding: 8px 12px; font-size: 9px; letter-spacing: 0.2em; }
   }
   .cm-bg {
     position: absolute;
@@ -2490,7 +2521,7 @@
         <div class="landing-card">
           <div class="lc-eyebrow">// WAT IS GEEKS</div>
           <h3>Een Belgisch geek-platform</h3>
-          <p>Een vodcast, een talkshow op VRT MAX, daily content op socials, events, en ooit een fysieke hub. Allemaal vanuit één crew, één plek, één stem.</p>
+          <p>Een podcast, een talkshow op VRT MAX, daily content op socials, live op Twitch, events, en ooit een fysieke hub. Allemaal vanuit één crew, één plek, één stem.</p>
         </div>
         <div class="landing-card">
           <div class="lc-eyebrow">// WAT IS EEN GEEK</div>
@@ -2636,6 +2667,7 @@
 
 <!-- ============ CREW MANIFEST (easter egg) ============ -->
 <div class="crew-manifest" id="crew-manifest">
+  <button class="cm-disconnect" id="cm-disconnect-btn"><span class="icon">✕</span> DISCONNECT</button>
   <div class="cm-stage">
     <div class="cm-bg"></div>
     <div class="cm-content">
@@ -2689,8 +2721,8 @@ const MAIN_PLANETS = [
     id: 'media',
     name: 'GEEKS MEDIA',
     short: 'GEEKS MEDIA',
-    tier: '// MEDIA HUB · 3 PROPERTIES',
-    desc: 'De show. Vodcast, talkshow, daily content. Klik om in te zoomen op het media-cluster.',
+    tier: '// MEDIA HUB · 4 PROPERTIES',
+    desc: 'De show. Podcast, talkshow, daily socials én live op Twitch. Klik om in te zoomen op het media-cluster.',
     orbit: 540, angle: -30, size: 110,
     color: '#ff9b1f', glow: 'rgba(255,155,31,0.65)', orbitDuration: 180, orbitDelay: 0,
     bg: 'radial-gradient(circle at 30% 30%, #ffc26d, #ff9b1f 50%, #802b00 100%)',
@@ -2743,7 +2775,7 @@ const MEDIA_PLANETS = [
     name: 'GEEKS UNREGULATED',
     short: 'UNREGULATED',
     tier: 'GEEKS // PODCAST',
-    desc: 'De vodcast. Eén uur, vaste structuur, op Twitch live. De anti-gepolijste plek waar de drie freewheelen.',
+    desc: 'De podcast. Eén uur, vaste structuur. De anti-gepolijste plek waar de drie freewheelen.',
     orbit: 420, angle: -60, size: 92,
     color: '#ff9b1f', glow: 'rgba(255,155,31,0.65)', orbitDuration: 130, orbitDelay: 0,
     bg: 'radial-gradient(circle at 30% 30%, #ffc26d, #ff9b1f 50%, #802b00 100%)',
@@ -2756,7 +2788,7 @@ const MEDIA_PLANETS = [
     name: 'GEEKS TALKSHOW',
     short: 'TALKSHOW',
     tier: 'GEEKS // VRT MAX',
-    desc: 'De videoreeks op VRT MAX. Eén host neemt de andere twee mee in zijn geek-wereld. Piloot opgenomen 25/03/2026.',
+    desc: 'De videoreeks op VRT MAX. Drie hosts, eigen wereld per aflevering. Geek culture op een streamingplatform van bij ons.',
     orbit: 460, angle: 70, size: 86,
     color: '#ff2bd6', glow: 'rgba(255,43,214,0.65)', orbitDuration: 150, orbitDelay: -40,
     bg: 'radial-gradient(circle at 30% 30%, #ff8de8, #ff2bd6 50%, #5a0048 100%)',
@@ -2774,6 +2806,19 @@ const MEDIA_PLANETS = [
     bg: 'radial-gradient(circle at 30% 30%, #7df0ff, #25e0ff 50%, #08475a 100%)',
     type: 'property',
     scene: 'media',
+  },
+  {
+    id: 'geek-live',
+    name: 'GEEKS LIVE',
+    short: 'GEEKS LIVE',
+    tier: 'GEEKS // TWITCH',
+    desc: 'Live op Twitch. Als de drie zin hebben om te gamen, gaan we live — geen vast schema, wel de community erbij.',
+    orbit: 510, angle: 220, size: 82,
+    color: '#6efb89', glow: 'rgba(110,251,137,0.6)', orbitDuration: 170, orbitDelay: -110,
+    bg: 'radial-gradient(circle at 30% 30%, #b6fcc5, #6efb89 50%, #1f5c33 100%)',
+    type: 'property',
+    scene: 'media',
+    hasRing: true,
   },
 ];
 
@@ -3323,6 +3368,7 @@ function buildPlanetHTML(p) {
   if (p.id === 'unregulated') body = buildUnregulatedHTML();
   else if (p.id === 'talkshow') body = buildTalkshowHTML();
   else if (p.id === 'daily') body = buildDailyHTML();
+  else if (p.id === 'geek-live') body = buildGeekLiveHTML();
   else if (p.id === 'planet-geek') body = buildPlanetGeekHTML();
   else if (p.id === 'inhabitants') body = buildInhabitantsHTML();
   else if (p.id === 'spectators') body = buildSpectatorsHTML();
@@ -3472,17 +3518,17 @@ function buildUnregulatedHTML() {
           <li><span class="key">Main Quest</span><span class="val">Wat speelt in de scene of in onze Discords. De aanleiding van de aflevering.</span></li>
           <li><span class="key">Side Quest</span><span class="val">Iemand brengt een hot take, obscure serie of gênant verhaal mee.</span></li>
           <li><span class="key">Weeklies</span><span class="val">Wat we spelen, kijken, lezen (of beloven te doen).</span></li>
-          <li><span class="key">Challenge Mode</span><span class="val">Eén kiest een game die de anderen móéten spelen, streamen op Twitch. Volgende keer faillure-debrief.</span></li>
+          <li><span class="key">Challenge Mode</span><span class="val">Eén kiest een game die de anderen móéten spelen. Het effectieve spelen gebeurt op <b style="color:var(--cream)">Geeks Live</b> — debrief volgt in de podcast.</span></li>
           <li><span class="key">Final Boss</span><span class="val">Soms — een gevoelig discussiepunt waar het écht spannend wordt.</span></li>
         </ul>
       </div>
       <div class="pv-card">
-        <div class="card-eyebrow">// BROADCAST INFRA</div>
-        <h3>Where &amp; When</h3>
-        <p><b style="color:var(--cream)">Twitch:</b> live streams van Challenge Mode + community moments. 2–3× per week.</p>
+        <div class="card-eyebrow">// WHERE &amp; WHEN</div>
+        <h3>Waar je het hoort</h3>
         <p><b style="color:var(--cream)">Podcast feeds:</b> audio-release op alle platformen (Spotify / Apple / YouTube).</p>
-        <p><b style="color:var(--cream)">TikTok &amp; IG Reels:</b> momenten en hot takes uit de vodcast als korte clips.</p>
-        <p><b style="color:var(--cream)">Frequentie:</b> wekelijkse vodcast-cadans + live moments tussendoor.</p>
+        <p><b style="color:var(--cream)">YouTube:</b> volledige aflevering als videoversie voor wie liever kijkt.</p>
+        <p><b style="color:var(--cream)">TikTok &amp; IG Reels:</b> momenten en hot takes uit de podcast als korte clips.</p>
+        <p><b style="color:var(--cream)">Frequentie:</b> wekelijkse cadans.</p>
         <p style="margin-top: 16px; color: var(--orange); font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.2em;">// THE ANTI-POLISHED ONE</p>
       </div>
     </div>
@@ -3490,7 +3536,37 @@ function buildUnregulatedHTML() {
     <div class="pv-card" style="margin-bottom: 40px;">
       <div class="card-eyebrow">// DNA</div>
       <h3>Geen script. Wel structuur.</h3>
-      <p>Unregulated is geen TV. Het is een ruimte waar de drie hun mening écht kunnen vormen, in real time, met de community erbij. De structuur is de drager, het gesprek is het hart. <b style="color:var(--orange)">Dit is waar we ons het minst gepolijst kunnen permitteren.</b></p>
+      <p>Unregulated is geen TV. Het is een ruimte waar de drie hun mening écht kunnen vormen, in real time. De structuur is de drager, het gesprek is het hart. <b style="color:var(--orange)">Dit is waar we ons het minst gepolijst kunnen permitteren.</b></p>
+    </div>
+  `;
+}
+
+// =====================================================================
+// GEEKS LIVE — Twitch game streams
+// =====================================================================
+function buildGeekLiveHTML() {
+  return `
+    <div class="pv-grid">
+      <div class="pv-card">
+        <div class="card-eyebrow">// FORMAT</div>
+        <h3>Live. Met of zonder plan.</h3>
+        <p>Geen vast schema. Geen scripted bit. Als één van de drie zin heeft om te gamen, gaan we live. Soms samen, soms solo, soms met gasten.</p>
+        <p>De plek waar het effectieve gamen gebeurt — inclusief de <b style="color:var(--cream)">Challenge Mode</b>-opdrachten die in de podcast Unregulated worden uitgedeeld.</p>
+      </div>
+      <div class="pv-card">
+        <div class="card-eyebrow">// WHERE</div>
+        <h3>Twitch first</h3>
+        <p><b style="color:var(--cream)">Platform:</b> Twitch — live streams + VOD's.</p>
+        <p><b style="color:var(--cream)">Frequentie:</b> ad-hoc. Aankondigingen op de socials en in Discord.</p>
+        <p><b style="color:var(--cream)">Clips &amp; recap:</b> highlights belanden in Geeks Daily en in Reels op de andere platformen.</p>
+        <p style="margin-top: 16px; color: #6efb89; font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.2em;">// THE LIVE ONE</p>
+      </div>
+    </div>
+
+    <div class="pv-card" style="margin-bottom: 40px;">
+      <div class="card-eyebrow">// DNA</div>
+      <h3>Community boven kalender.</h3>
+      <p>Geeks Live draait niet op een schema, maar op zin. De community krijgt de drie écht onder elkaar zien gamen — fail-momenten incluis. <b style="color:#6efb89">Dit is waar de chat meespeelt.</b></p>
     </div>
   `;
 }
@@ -3899,6 +3975,7 @@ document.querySelector('.geeks-core').addEventListener('click', () => {
   }
 });
 document.getElementById('cm-close-btn').addEventListener('click', closeCrewManifest);
+document.getElementById('cm-disconnect-btn').addEventListener('click', closeCrewManifest);
 
 // =====================================================================
 // LANDING PAGE — explore the universe
