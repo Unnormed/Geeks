@@ -1707,8 +1707,11 @@
     inset: 0;
     z-index: 1000;
     background:
-      linear-gradient(180deg, rgba(5, 0, 16, 0.94) 0%, rgba(10, 5, 24, 0.88) 40%, rgba(123, 44, 255, 0.22) 100%),
-      url('assets/crew-group.jpg') center 30% / cover no-repeat;
+      radial-gradient(ellipse at 18% 30%, rgba(255, 155, 31, 0.22), transparent 55%),
+      radial-gradient(ellipse at 82% 20%, rgba(255, 43, 214, 0.18), transparent 55%),
+      radial-gradient(ellipse at 50% 95%, rgba(123, 44, 255, 0.38), transparent 60%),
+      linear-gradient(180deg, rgba(5, 0, 16, 0.86) 0%, rgba(10, 5, 24, 0.72) 45%, rgba(5, 0, 16, 0.96) 100%),
+      url('assets/trio-cyber-1.jpg') center 30% / cover no-repeat;
     overflow-y: auto;
     transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -1716,15 +1719,19 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at center, transparent 25%, rgba(5, 0, 16, 0.85) 75%);
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 35%, transparent 0%, rgba(5, 0, 16, 0.55) 75%, rgba(5, 0, 16, 0.92) 100%);
     pointer-events: none;
   }
   .landing::after {
-    /* subtle scan-lines on landing too */
+    /* scan-lines + grid */
     content: "";
     position: absolute;
     inset: 0;
-    background: repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(123, 44, 255, 0.03) 2px, rgba(123, 44, 255, 0.03) 3px);
+    background:
+      repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(123, 44, 255, 0.04) 2px, rgba(123, 44, 255, 0.04) 3px),
+      linear-gradient(rgba(123, 44, 255, 0.06) 1px, transparent 1px) 0 0 / 48px 48px,
+      linear-gradient(90deg, rgba(123, 44, 255, 0.06) 1px, transparent 1px) 0 0 / 48px 48px;
     mix-blend-mode: overlay;
     pointer-events: none;
   }
@@ -1733,17 +1740,74 @@
     pointer-events: none;
     transform: scale(1.06);
   }
+
+  /* Corner HUD brackets */
+  .landing .hud-corner {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-color: var(--orange);
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .landing .hud-corner.tl { top: 22px; left: 22px; border-top: 2px solid; border-left: 2px solid; }
+  .landing .hud-corner.tr { top: 22px; right: 22px; border-top: 2px solid; border-right: 2px solid; }
+  .landing .hud-corner.bl { bottom: 22px; left: 22px; border-bottom: 2px solid; border-left: 2px solid; }
+  .landing .hud-corner.br { bottom: 22px; right: 22px; border-bottom: 2px solid; border-right: 2px solid; }
+
   .landing-inner {
     position: relative;
     z-index: 2;
     max-width: 1180px;
     margin: 0 auto;
-    padding: 70px 40px 90px;
+    padding: 0 40px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
   }
+
+  /* HERO zone — fills viewport so CTA is always above the fold */
+  .landing-hero {
+    min-height: 100svh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 0 12px;
+    gap: 0;
+  }
+
+  /* Live status pill (replaces the old eyebrow above logo) */
+  .landing-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--cream);
+    padding: 8px 16px 8px 14px;
+    border: 1px solid rgba(255, 155, 31, 0.55);
+    border-radius: 999px;
+    background: rgba(10, 5, 24, 0.55);
+    backdrop-filter: blur(8px);
+    margin-bottom: 28px;
+    box-shadow: 0 0 24px rgba(255, 155, 31, 0.15), inset 0 0 12px rgba(255, 155, 31, 0.08);
+  }
+  .landing-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 12px var(--orange), 0 0 24px rgba(255, 155, 31, 0.6);
+    animation: blink-dot 1.4s ease-in-out infinite;
+  }
+  .landing-status .accent { color: var(--orange); }
+
+  /* Old eyebrow kept for compatibility but no longer used */
   .landing-eyebrow {
     font-family: var(--f-mono);
     font-size: 11px;
@@ -1761,13 +1825,37 @@
     background: var(--orange);
     opacity: 0.7;
   }
+
+  /* Logo with halo */
+  .landing-logo-wrap {
+    position: relative;
+    display: inline-flex;
+    justify-content: center;
+    margin-bottom: 22px;
+  }
+  .landing-halo {
+    position: absolute;
+    inset: -40% -20%;
+    background:
+      radial-gradient(circle at 30% 50%, rgba(255, 155, 31, 0.45), transparent 55%),
+      radial-gradient(circle at 75% 60%, rgba(255, 43, 214, 0.40), transparent 55%),
+      radial-gradient(circle at 50% 40%, rgba(123, 44, 255, 0.35), transparent 60%);
+    filter: blur(18px);
+    z-index: -1;
+    pointer-events: none;
+    animation: halo-breathe 5.5s ease-in-out infinite;
+  }
+  @keyframes halo-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
   .landing-logo {
     font-family: var(--f-display);
-    font-size: clamp(96px, 16vw, 200px);
+    font-size: clamp(88px, 15vw, 188px);
     line-height: 0.85;
     color: var(--cream);
     letter-spacing: -0.03em;
-    margin: 0 0 22px;
+    margin: 0;
     text-shadow:
       3px 3px 0 var(--orange),
       6px 6px 0 var(--purple-hot),
@@ -1776,20 +1864,66 @@
   .landing-logo .dot { color: var(--orange); }
   .landing-tagline {
     font-family: var(--f-body);
-    font-size: clamp(16px, 2vw, 20px);
+    font-size: clamp(16px, 2vw, 21px);
     color: var(--cream);
-    max-width: 700px;
-    margin-bottom: 38px;
+    max-width: 720px;
+    margin-bottom: 32px;
     letter-spacing: 0.02em;
   }
   .landing-tagline em { color: var(--orange); font-style: normal; font-weight: 700; }
+  .landing-tagline .cursor {
+    display: inline-block;
+    width: 9px;
+    height: 1em;
+    margin-left: 4px;
+    background: var(--orange);
+    vertical-align: -3px;
+    animation: blink-dot 1s steps(2, end) infinite;
+  }
+
+  /* Scroll-for-intel hint under CTA */
+  .scroll-hint {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: rgba(244, 236, 216, 0.55);
+    cursor: pointer;
+    user-select: none;
+  }
+  .scroll-hint .chev {
+    width: 14px;
+    height: 14px;
+    border-right: 2px solid var(--orange);
+    border-bottom: 2px solid var(--orange);
+    transform: rotate(45deg);
+    animation: chev-bounce 1.6s ease-in-out infinite;
+    opacity: 0.8;
+  }
+  @keyframes chev-bounce {
+    0%, 100% { transform: rotate(45deg) translate(0, 0); opacity: 0.4; }
+    50%      { transform: rotate(45deg) translate(4px, 4px); opacity: 1; }
+  }
+
+  /* MORE zone — below the fold */
+  .landing-more {
+    width: 100%;
+    padding: 40px 0 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
   .landing-lead {
     font-family: var(--f-body);
     font-size: clamp(14px, 1.4vw, 17px);
     line-height: 1.65;
     color: rgba(244, 236, 216, 0.85);
     max-width: 760px;
-    margin: 0 auto 56px;
+    margin: 0 auto 48px;
   }
   .landing-lead b { color: var(--cream); }
   .landing-grid {
@@ -1797,7 +1931,7 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 18px;
     width: 100%;
-    margin-bottom: 60px;
+    margin-bottom: 48px;
   }
   @media (max-width: 1000px) {
     .landing-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
@@ -1859,7 +1993,7 @@
     color: var(--ink);
     border: none;
     border-radius: 12px;
-    padding: 20px 44px;
+    padding: 22px 48px;
     font-family: var(--f-mono);
     font-size: 14px;
     font-weight: 800;
@@ -1870,7 +2004,12 @@
     align-items: center;
     gap: 18px;
     box-shadow: 0 8px 24px rgba(255, 155, 31, 0.35), 0 0 0 1px var(--orange);
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    animation: cta-pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes cta-pulse {
+    0%, 100% { box-shadow: 0 8px 24px rgba(255, 155, 31, 0.35), 0 0 0 1px var(--orange), 0 0 0 0 rgba(255, 155, 31, 0.45); }
+    50%      { box-shadow: 0 8px 28px rgba(255, 155, 31, 0.50), 0 0 0 1px var(--orange), 0 0 0 14px rgba(255, 155, 31, 0); }
   }
   .landing-cta:hover {
     transform: translateY(-2px);
@@ -2188,17 +2327,28 @@
     .cm-content { padding: 50px 18px; }
 
     /* Landing page tighter on mobile */
-    .landing-inner { padding: 40px 18px 60px; }
-    .landing-logo { font-size: clamp(70px, 22vw, 120px); margin-bottom: 14px; }
+    .landing-inner { padding: 0 18px; }
+    .landing-hero { padding: 18px 0 8px; }
+    .landing-more { padding: 28px 0 60px; }
+    .landing-logo { font-size: clamp(68px, 21vw, 118px); }
+    .landing-logo-wrap { margin-bottom: 16px; }
+    .landing-status {
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      padding: 6px 12px 6px 10px;
+      margin-bottom: 18px;
+      gap: 9px;
+    }
+    .landing-status .status-dot { width: 7px; height: 7px; }
     .landing-eyebrow {
       font-size: 9px;
       letter-spacing: 0.3em;
       margin-bottom: 16px;
     }
     .landing-eyebrow::before, .landing-eyebrow::after { width: 24px; }
-    .landing-tagline { font-size: 14px; margin-bottom: 24px; }
-    .landing-lead { font-size: 13px; margin-bottom: 32px; line-height: 1.55; }
-    .landing-grid { gap: 10px; margin-bottom: 36px; }
+    .landing-tagline { font-size: 14px; margin-bottom: 22px; }
+    .landing-lead { font-size: 13px; margin-bottom: 28px; line-height: 1.55; }
+    .landing-grid { gap: 10px; margin-bottom: 28px; }
     .landing-card { padding: 18px 16px; }
     .landing-card h3 { font-size: 15px; }
     .landing-card p { font-size: 11.5px; }
@@ -2208,7 +2358,14 @@
       letter-spacing: 0.2em;
       gap: 12px;
     }
+    .scroll-hint { font-size: 9px; letter-spacing: 0.3em; margin-top: 14px; }
+    .scroll-hint .chev { width: 11px; height: 11px; }
     .landing-foot { font-size: 9px; letter-spacing: 0.2em; }
+    .landing .hud-corner { width: 24px; height: 24px; }
+    .landing .hud-corner.tl, .landing .hud-corner.tr { top: 12px; }
+    .landing .hud-corner.bl, .landing .hud-corner.br { bottom: 12px; }
+    .landing .hud-corner.tl, .landing .hud-corner.bl { left: 12px; }
+    .landing .hud-corner.tr, .landing .hud-corner.br { right: 12px; }
   }
 
   /* Very small phones — even tighter */
@@ -2289,50 +2446,74 @@
 
 <!-- ============ LANDING PAGE ============ -->
 <div class="landing" id="landing">
+  <span class="hud-corner tl"></span>
+  <span class="hud-corner tr"></span>
+  <span class="hud-corner bl"></span>
+  <span class="hud-corner br"></span>
+
   <div class="landing-inner">
-    <div class="landing-eyebrow">// DE GEEK UNIVERSE · BE ⋅ 2026</div>
-    <h1 class="landing-logo">GEEKS<span class="dot">.</span></h1>
-    <div class="landing-tagline">Belgian geek HQ. <em>Voor wie het altijd al was.</em></div>
-
-    <p class="landing-lead">
-      Geek culture is in België allang geen niche meer — maar het wordt nog wel zo behandeld.
-      Versnipperde communities, geïmporteerde formats, géén plek die het samenbrengt.
-      <b>Tot nu.</b> Wij bouwen het Belgische platform waar geeks zich thuis voelen, online én offline.
-    </p>
-
-    <div class="landing-grid">
-      <div class="landing-card">
-        <div class="lc-eyebrow">// WAT IS GEEKS</div>
-        <h3>Een Belgisch geek-platform</h3>
-        <p>Een vodcast, een talkshow op VRT MAX, daily content op socials, events, en ooit een fysieke hub. Allemaal vanuit één crew, één plek, één stem.</p>
+    <!-- HERO (above the fold) -->
+    <section class="landing-hero">
+      <div class="landing-status">
+        <span class="status-dot"></span>
+        <span>LIVE · DE GEEK UNIVERSE · <span class="accent">BE 2026</span></span>
       </div>
-      <div class="landing-card">
-        <div class="lc-eyebrow">// WAT IS EEN GEEK</div>
-        <h3>Niet één type. Veel types.</h3>
-        <p>Iemand die diep in een wereld duikt — games, films, manga, K-pop, tech, board games — en daar méér in ziet dan ontspanning. Geen niche, wel passie.</p>
-      </div>
-      <div class="landing-card">
-        <div class="lc-eyebrow">// VOOR WIE</div>
-        <h3>Voor wie het altijd al was</h3>
-        <p>Geeks die nooit herkenning voelden in de Belgische mainstream. Stemmen die genegeerd worden. Mensen die hun passie niet meer willen uitleggen.</p>
-      </div>
-      <div class="landing-card">
-        <div class="lc-eyebrow">// HOE WE HET DOEN</div>
-        <h3>Community boven content</h3>
-        <p>Drie hosts, drie classes, één crew. Geen polish die in de weg zit, geen import, geen gatekeeping. Belgische geek culture, op zijn eigen manier.</p>
-      </div>
-    </div>
 
-    <button class="landing-cta" id="landing-cta">
-      <span class="cta-icon">▶</span>
-      <span class="cta-text">EXPLORE THE UNIVERSE</span>
-      <span class="cta-arrow">→</span>
-    </button>
+      <div class="landing-logo-wrap">
+        <span class="landing-halo" aria-hidden="true"></span>
+        <h1 class="landing-logo">GEEKS<span class="dot">.</span></h1>
+      </div>
 
-    <div class="landing-foot">
-      <span class="dot-blink"></span>
-      <span>// SYSTEM READY · CLICK TO ENTER</span>
-    </div>
+      <div class="landing-tagline">Belgian geek HQ. <em>Voor wie het altijd al was.</em><span class="cursor" aria-hidden="true"></span></div>
+
+      <button class="landing-cta" id="landing-cta">
+        <span class="cta-icon">▶</span>
+        <span class="cta-text">EXPLORE THE UNIVERSE</span>
+        <span class="cta-arrow">→</span>
+      </button>
+
+      <div class="scroll-hint" id="landing-scroll-hint" role="button" tabindex="0">
+        <span>// SCROLL FOR INTEL</span>
+        <span class="chev" aria-hidden="true"></span>
+      </div>
+    </section>
+
+    <!-- MORE (below the fold) -->
+    <section class="landing-more">
+      <p class="landing-lead">
+        Geek culture is in België allang geen niche meer — maar het wordt nog wel zo behandeld.
+        Versnipperde communities, geïmporteerde formats, géén plek die het samenbrengt.
+        <b>Tot nu.</b> Wij bouwen het Belgische platform waar geeks zich thuis voelen, online én offline.
+      </p>
+
+      <div class="landing-grid">
+        <div class="landing-card">
+          <div class="lc-eyebrow">// WAT IS GEEKS</div>
+          <h3>Een Belgisch geek-platform</h3>
+          <p>Een vodcast, een talkshow op VRT MAX, daily content op socials, events, en ooit een fysieke hub. Allemaal vanuit één crew, één plek, één stem.</p>
+        </div>
+        <div class="landing-card">
+          <div class="lc-eyebrow">// WAT IS EEN GEEK</div>
+          <h3>Niet één type. Veel types.</h3>
+          <p>Iemand die diep in een wereld duikt — games, films, manga, K-pop, tech, board games — en daar méér in ziet dan ontspanning. Geen niche, wel passie.</p>
+        </div>
+        <div class="landing-card">
+          <div class="lc-eyebrow">// VOOR WIE</div>
+          <h3>Voor wie het altijd al was</h3>
+          <p>Geeks die nooit herkenning voelden in de Belgische mainstream. Stemmen die genegeerd worden. Mensen die hun passie niet meer willen uitleggen.</p>
+        </div>
+        <div class="landing-card">
+          <div class="lc-eyebrow">// HOE WE HET DOEN</div>
+          <h3>Community boven content</h3>
+          <p>Drie hosts, drie classes, één crew. Geen polish die in de weg zit, geen import, geen gatekeeping. Belgische geek culture, op zijn eigen manier.</p>
+        </div>
+      </div>
+
+      <div class="landing-foot">
+        <span class="dot-blink"></span>
+        <span>// SYSTEM READY · SCROLL UP &amp; CLICK TO ENTER</span>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -3726,6 +3907,26 @@ const landingCta = document.getElementById('landing-cta');
 landingCta.addEventListener('click', () => {
   document.getElementById('landing').classList.add('done');
 });
+
+// Scroll hint → smooth-scroll the landing to the "more" zone
+const landingScrollHint = document.getElementById('landing-scroll-hint');
+if (landingScrollHint) {
+  const scrollToMore = () => {
+    const landing = document.getElementById('landing');
+    const more = landing.querySelector('.landing-more');
+    if (!landing || !more) return;
+    const target = more.offsetTop - 24;
+    landing.scrollTo({ top: target, behavior: 'smooth' });
+  };
+  landingScrollHint.addEventListener('click', scrollToMore);
+  landingScrollHint.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      scrollToMore();
+    }
+  });
+}
 
 // Re-open intro from HUD
 document.getElementById('btn-intro-reopen').addEventListener('click', () => {
