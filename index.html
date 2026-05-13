@@ -2819,6 +2819,28 @@ const GeeksAudio = (() => {
     if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
   }
 
+  // iOS Web Audio unlock — call inside a real user-gesture handler.
+  // Creates the context, plays a silent 1-frame buffer to flip iOS into "audio enabled",
+  // and resumes. After this, subsequent scheduled sounds play reliably.
+  let _primed = false;
+  function prime() {
+    if (_primed) {
+      resumeIfNeeded();
+      return;
+    }
+    ensureCtx();
+    if (!ctx) return;
+    try {
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      if (src.start) src.start(0); else src.noteOn(0);
+    } catch (e) {}
+    resumeIfNeeded();
+    _primed = true;
+  }
+
   // ---------- AMBIENT — lo-fi Final Fantasy town/world vibe ----------
   // Layers: deep bass pad + Asus2 chord pad + bell-like arpeggio melody
   function startAmbient() {
@@ -2959,27 +2981,27 @@ const GeeksAudio = (() => {
   }
 
   function playClick() {
-    ensureCtx(); resumeIfNeeded();
+    prime();
     tone({ freq: 880, freq2: 1175, type: 'square', dur: 0.07, gain: 0.22 });
   }
   function playSelect() {
     // FF menu select: two-tone "di-ding"
-    ensureCtx(); resumeIfNeeded();
+    prime();
     tone({ freq: 988,  type: 'square', dur: 0.05, gain: 0.22 });
     tone({ freq: 1319, type: 'square', dur: 0.10, gain: 0.24, delay: 0.05 });
   }
   function playBack() {
     // Cancel sound: downward sweep, classic FF cancel
-    ensureCtx(); resumeIfNeeded();
+    prime();
     tone({ freq: 660, freq2: 220, type: 'square', dur: 0.16, gain: 0.22 });
   }
   function playHover() {
-    ensureCtx(); resumeIfNeeded();
+    prime();
     tone({ freq: 1568, freq2: 1760, type: 'triangle', dur: 0.04, gain: 0.10 });
   }
   // FF-style warp/teleport: chord stab + rising sweep + bright finishing chime
   function playWarp() {
-    ensureCtx(); resumeIfNeeded();
+    prime();
     // 1) chord stab (A minor: A + C + E)
     tone({ freq: 220,    type: 'square',   dur: 0.10, gain: 0.20 });
     tone({ freq: 261.63, type: 'square',   dur: 0.10, gain: 0.16 });
@@ -3003,10 +3025,15 @@ const GeeksAudio = (() => {
   }
 
   return {
-    startAmbient, setMuted, toggleMuted, isMuted, updateToggleUI,
+    prime, startAmbient, setMuted, toggleMuted, isMuted, updateToggleUI,
     playClick, playSelect, playBack, playHover, playWarp,
   };
 })();
+
+// iOS-friendly priming: first pointerdown anywhere unlocks audio
+['pointerdown', 'touchstart', 'click'].forEach(evt => {
+  document.addEventListener(evt, () => GeeksAudio.prime(), { once: true, capture: true, passive: true });
+});
 
 // Wire the Damp button
 document.addEventListener('DOMContentLoaded', GeeksAudio.updateToggleUI);
@@ -3026,8 +3053,8 @@ document.addEventListener('click', (e) => {
     '.btn-intro-reopen, .btn-ghost, .scroll-hint, .minimap-dot'
   );
   if (!t) return;
-  if (t.matches('.landing-cta')) { GeeksAudio.startAmbient(); GeeksAudio.playWarp(); return; }
-  if (t.matches('.planet, .geeks-core')) { GeeksAudio.playWarp(); return; }
+  if (t.matches('.landing-cta')) { GeeksAudio.prime(); GeeksAudio.startAmbient(); GeeksAudio.playWarp(); return; }
+  if (t.matches('.planet, .geeks-core')) { GeeksAudio.playSelect(); return; }
   if (t.matches('.btn-disconnect, .btn-disconnect-galaxy, .cm-close, .cm-disconnect, .btn-exit-hub')) { GeeksAudio.playBack(); return; }
   if (t.matches('.host-pick')) { GeeksAudio.playSelect(); return; }
   GeeksAudio.playClick();
@@ -3637,6 +3664,8 @@ function deselectPlanet() {
 function warpToPlanet(id) {
   const p = PLANETS.find(x => x.id === id);
   if (!p) return;
+
+  GeeksAudio.playWarp();
 
   // Trigger wormhole warp tunnel effect
   const tunnel = document.getElementById('warp-tunnel');
