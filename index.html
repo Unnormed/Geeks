@@ -2572,7 +2572,7 @@
 <!-- Background music: Medieval Fantasy ambient (looped)
      Using <video> instead of <audio> because iOS Safari respects the silent-switch
      for <audio> elements but plays <video> audio regardless. -->
-<video id="bg-music" src="assets/ambient.mp4" loop preload="auto" playsinline muted webkit-playsinline x5-playsinline disablepictureinpicture></video>
+<video id="bg-music" src="assets/ambient.mp4" loop preload="auto" autoplay muted playsinline webkit-playsinline x5-playsinline disablepictureinpicture></video>
 
 <!-- Always-visible sound toggle (top-center) -->
 <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Geluid dempen of aanzetten">
@@ -2862,33 +2862,34 @@ const GeeksAudio = (() => {
   // and resumes. After this, subsequent scheduled sounds play reliably.
   let _primed = false;
   function prime() {
-    if (_primed) {
-      resumeIfNeeded();
-      // Even if already primed, ensure music is playing (e.g. autoplay was blocked earlier)
-      if (!muted) {
-        const el = getMusicEl();
-        if (el && el.paused) {
-          el.muted = false;
-          const p = el.play();
-          if (p && p.catch) p.catch(() => {});
-          fadeMusicTo(MUSIC_VOLUME, 1500);
-        }
-      }
-      return;
-    }
     ensureCtx();
-    if (!ctx) return;
-    try {
-      const buf = ctx.createBuffer(1, 1, 22050);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      if (src.start) src.start(0); else src.noteOn(0);
-    } catch (e) {}
+    if (ctx && !_primed) {
+      // iOS Web Audio unlock — play a silent 1-frame buffer inside the gesture
+      try {
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        if (src.start) src.start(0); else src.noteOn(0);
+      } catch (e) {}
+      _primed = true;
+    }
     resumeIfNeeded();
-    _primed = true;
-    // First gesture also starts music (in case autoplay was blocked)
-    startAmbient();
+
+    // Always sync the music element with the user's preference.
+    // Critically: if the video is already playing muted (autoplay path),
+    // a user gesture is what allows us to unmute it.
+    const el = getMusicEl();
+    if (el && !muted) {
+      el.muted = false;
+      if (el.paused) {
+        const p = el.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+      if (el.volume < MUSIC_VOLUME - 0.01) {
+        fadeMusicTo(MUSIC_VOLUME, 1500);
+      }
+    }
   }
 
   // ---------- BACKGROUND MUSIC — looped Medieval Fantasy track ----------
