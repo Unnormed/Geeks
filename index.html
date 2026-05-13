@@ -58,6 +58,73 @@
       var(--bg-void);
   }
 
+  /* ====== SOUND TOGGLE (top-center, always visible) ====== */
+  .sound-toggle {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    background: rgba(5, 0, 16, 0.72);
+    border: 1px solid rgba(255, 155, 31, 0.55);
+    border-radius: 999px;
+    padding: 9px 18px 9px 14px;
+    color: var(--cream);
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 155, 31, 0.18);
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .sound-toggle:hover {
+    border-color: var(--orange);
+    background: rgba(255, 155, 31, 0.18);
+    color: var(--cream);
+  }
+  .sound-toggle.muted {
+    border-color: rgba(244, 236, 216, 0.3);
+    color: rgba(244, 236, 216, 0.65);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  }
+  .sound-toggle .ic { font-size: 14px; line-height: 1; }
+  .sound-toggle .wave {
+    display: inline-flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 12px;
+  }
+  .sound-toggle .wave span {
+    display: block;
+    width: 2px;
+    background: var(--orange);
+    border-radius: 1px;
+    animation: wave-bar 1.2s ease-in-out infinite;
+  }
+  .sound-toggle .wave span:nth-child(1) { height: 35%; animation-delay: 0s; }
+  .sound-toggle .wave span:nth-child(2) { height: 70%; animation-delay: 0.15s; }
+  .sound-toggle .wave span:nth-child(3) { height: 100%; animation-delay: 0.3s; }
+  .sound-toggle .wave span:nth-child(4) { height: 55%; animation-delay: 0.45s; }
+  .sound-toggle.muted .wave span {
+    background: rgba(244, 236, 216, 0.4);
+    animation: none;
+    height: 35% !important;
+  }
+  @keyframes wave-bar {
+    0%, 100% { transform: scaleY(0.4); }
+    50%      { transform: scaleY(1); }
+  }
+  @media (max-width: 700px) {
+    .sound-toggle { font-size: 9px; padding: 7px 12px 7px 10px; letter-spacing: 0.22em; gap: 8px; top: 10px; }
+  }
+
   /* ====== STARFIELD CANVAS ====== */
   #starfield {
     position: absolute;
@@ -2472,6 +2539,12 @@
 </style>
 </head>
 <body data-scene="main">
+<!-- Always-visible sound toggle (top-center) -->
+<button class="sound-toggle" id="sound-toggle" type="button" aria-label="Geluid dempen of aanzetten">
+  <span class="wave" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+  <span class="lbl" id="sound-toggle-lbl">DAMP</span>
+</button>
+
 <div class="scene-indicator">// GALAXY ▸ <span class="accent">MEDIA HUB</span></div>
 <button class="btn-exit-hub" id="btn-exit-hub">← TERUG NAAR GALAXY</button>
 
@@ -2710,6 +2783,187 @@
 <div class="vignette"></div>
 
 <script>
+// =====================================================================
+// AUDIO — cosmic ambient pad + arcade-style SFX (Web Audio API)
+// Lazy-init: AudioContext only created on first user gesture (browser-safe).
+// =====================================================================
+const GeeksAudio = (() => {
+  const STORAGE_KEY = 'geeks-sound-muted';
+  let ctx = null;
+  let master = null;
+  let ambientStarted = false;
+  let ambientGain = null;
+  let muted = localStorage.getItem(STORAGE_KEY) === '1';
+
+  function ensureCtx() {
+    if (ctx) return;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return;
+    ctx = new Ctor();
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : 1;
+    master.connect(ctx.destination);
+  }
+
+  function resumeIfNeeded() {
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+  }
+
+  function startAmbient() {
+    ensureCtx();
+    if (!ctx || ambientStarted) return;
+    resumeIfNeeded();
+    ambientStarted = true;
+
+    // Master ambient bus — fade in over 4s so it's never abrupt
+    ambientGain = ctx.createGain();
+    ambientGain.gain.value = 0;
+    ambientGain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 4);
+
+    // Lowpass + slow LFO so the timbre breathes
+    const lpf = ctx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 700;
+    lpf.Q.value = 0.6;
+
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.05;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 220;
+    lfo.connect(lfoGain).connect(lpf.frequency);
+    lfo.start();
+
+    // Open Asus2 cluster — A1, E2, A2, B2 (cosmic / open / not too major-or-minor)
+    const voices = [
+      { f: 55,    g: 0.32, type: 'sine'     },
+      { f: 82.41, g: 0.24, type: 'sine'     },
+      { f: 110,   g: 0.18, type: 'sine'     },
+      { f: 123.47,g: 0.08, type: 'triangle' },
+    ];
+    voices.forEach((v, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = v.type;
+      osc.frequency.value = v.f;
+      osc.detune.value = (i - 1.5) * 5;
+      const g = ctx.createGain();
+      g.gain.value = v.g;
+      osc.connect(g).connect(lpf);
+      osc.start();
+    });
+
+    // High shimmer sine for cosmic sparkle
+    const shimmer = ctx.createOscillator();
+    shimmer.type = 'sine';
+    shimmer.frequency.value = 659.25;
+    const shimmerGain = ctx.createGain();
+    shimmerGain.gain.value = 0.03;
+    shimmer.connect(shimmerGain).connect(ambientGain);
+    shimmer.start();
+
+    lpf.connect(ambientGain).connect(master);
+  }
+
+  function setMuted(v) {
+    muted = !!v;
+    try { localStorage.setItem(STORAGE_KEY, muted ? '1' : '0'); } catch (e) {}
+    if (master) {
+      const now = ctx.currentTime;
+      master.gain.cancelScheduledValues(now);
+      master.gain.setValueAtTime(master.gain.value, now);
+      master.gain.linearRampToValueAtTime(muted ? 0 : 1, now + 0.18);
+    }
+    // First unmute counts as user gesture — start ambient if not yet started
+    if (!muted && !ambientStarted) startAmbient();
+    updateToggleUI();
+  }
+  function toggleMuted() { setMuted(!muted); }
+  function isMuted() { return muted; }
+
+  // ---- SFX ----
+  function blip({ freq = 660, freq2 = null, type = 'square', dur = 0.08, gain = 0.12, attack = 0.005 } = {}) {
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    if (freq2 !== null) {
+      try { osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq2), now + dur); }
+      catch (e) { osc.frequency.linearRampToValueAtTime(freq2, now + dur); }
+    }
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(gain, now + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    osc.connect(g).connect(master);
+    osc.start(now);
+    osc.stop(now + dur + 0.02);
+  }
+
+  function playClick()  { ensureCtx(); resumeIfNeeded(); blip({ freq: 660, freq2: 880,  type: 'square',   dur: 0.06, gain: 0.10 }); }
+  function playSelect() { ensureCtx(); resumeIfNeeded(); blip({ freq: 880, freq2: 1100, type: 'triangle', dur: 0.09, gain: 0.11 }); }
+  function playBack()   { ensureCtx(); resumeIfNeeded(); blip({ freq: 660, freq2: 220,  type: 'square',   dur: 0.14, gain: 0.10 }); }
+  function playHover()  { ensureCtx(); resumeIfNeeded(); blip({ freq: 1320,freq2: 1480, type: 'sine',     dur: 0.03, gain: 0.04 }); }
+  function playWarp()   {
+    ensureCtx(); resumeIfNeeded();
+    blip({ freq: 220, freq2: 880,  type: 'sawtooth', dur: 0.30, gain: 0.09 });
+    setTimeout(() => blip({ freq: 440, freq2: 1320, type: 'triangle', dur: 0.22, gain: 0.07 }), 35);
+  }
+
+  // ---- Toggle UI ----
+  function updateToggleUI() {
+    const btn = document.getElementById('sound-toggle');
+    const lbl = document.getElementById('sound-toggle-lbl');
+    if (!btn || !lbl) return;
+    btn.classList.toggle('muted', muted);
+    lbl.textContent = muted ? 'GELUID AAN' : 'DAMP';
+    btn.setAttribute('aria-pressed', String(muted));
+  }
+
+  return {
+    startAmbient, setMuted, toggleMuted, isMuted, updateToggleUI,
+    playClick, playSelect, playBack, playHover, playWarp,
+  };
+})();
+
+// Wire the Damp button
+document.addEventListener('DOMContentLoaded', GeeksAudio.updateToggleUI);
+GeeksAudio.updateToggleUI();
+document.getElementById('sound-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  GeeksAudio.toggleMuted();
+});
+
+// Global click delegation — gaming blips for everything that's clickable.
+// Capture phase so the sound fires before existing handlers do their thing.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#sound-toggle')) return; // toggle handles its own UI feedback
+  const t = e.target.closest(
+    '.landing-cta, .planet, .geeks-core, .btn-disconnect, .btn-disconnect-galaxy, ' +
+    '.cm-close, .cm-disconnect, .btn-exit-hub, .host-pick, .nav-item, ' +
+    '.btn-intro-reopen, .btn-ghost, .scroll-hint, .minimap-dot'
+  );
+  if (!t) return;
+  if (t.matches('.landing-cta')) { GeeksAudio.startAmbient(); GeeksAudio.playWarp(); return; }
+  if (t.matches('.planet, .geeks-core')) { GeeksAudio.playWarp(); return; }
+  if (t.matches('.btn-disconnect, .btn-disconnect-galaxy, .cm-close, .cm-disconnect, .btn-exit-hub')) { GeeksAudio.playBack(); return; }
+  if (t.matches('.host-pick')) { GeeksAudio.playSelect(); return; }
+  GeeksAudio.playClick();
+}, true);
+
+// Subtle hover blip on planets only (universe feels alive, not annoying)
+let _lastHoverTs = 0;
+let _lastHoverTarget = null;
+document.addEventListener('pointerover', (e) => {
+  const p = e.target.closest('.planet, .geeks-core');
+  if (!p) return;
+  const now = performance.now();
+  if (p === _lastHoverTarget && now - _lastHoverTs < 600) return;
+  if (now - _lastHoverTs < 80) return;
+  _lastHoverTs = now;
+  _lastHoverTarget = p;
+  GeeksAudio.playHover();
+}, true);
+
 // =====================================================================
 // PLANETS DATA — two scenes
 // Main galaxy: GEEKS MEDIA (hub) + universe context (INHABITANTS, SPECTATORS, THE PITCH)
