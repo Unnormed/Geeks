@@ -58,6 +58,36 @@
       var(--bg-void);
   }
 
+  /* Subtle crew photo behind the galaxy */
+  .galaxy-bg-photo {
+    position: absolute;
+    inset: 0;
+    background: url('assets/crew-group.jpg') center 28% / cover no-repeat;
+    opacity: 0.13;
+    z-index: 0;
+    pointer-events: none;
+    filter: saturate(0.85) contrast(0.95);
+  }
+  .galaxy-bg-photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 0%, rgba(5,0,16,0.65) 70%, rgba(5,0,16,0.92) 100%);
+    pointer-events: none;
+  }
+
+  /* Hide bg-music video element off-screen — only audio matters */
+  #bg-music {
+    position: fixed;
+    width: 2px;
+    height: 2px;
+    top: -10px;
+    left: -10px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* ====== SOUND TOGGLE (top-center, always visible) ====== */
   .sound-toggle {
     position: fixed;
@@ -2539,8 +2569,10 @@
 </style>
 </head>
 <body data-scene="main">
-<!-- Background music: Medieval Fantasy ambient (looped) -->
-<audio id="bg-music" src="assets/ambient.m4a" loop preload="auto" playsinline crossorigin="anonymous"></audio>
+<!-- Background music: Medieval Fantasy ambient (looped)
+     Using <video> instead of <audio> because iOS Safari respects the silent-switch
+     for <audio> elements but plays <video> audio regardless. -->
+<video id="bg-music" src="assets/ambient.mp4" loop preload="auto" playsinline muted webkit-playsinline x5-playsinline disablepictureinpicture></video>
 
 <!-- Always-visible sound toggle (top-center) -->
 <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Geluid dempen of aanzetten">
@@ -2626,6 +2658,7 @@
 
 <!-- ============ UNIVERSE ============ -->
 <div class="universe" id="universe">
+  <div class="galaxy-bg-photo" aria-hidden="true"></div>
   <canvas id="starfield"></canvas>
 
   <div class="galaxy-viewport">
@@ -2831,6 +2864,16 @@ const GeeksAudio = (() => {
   function prime() {
     if (_primed) {
       resumeIfNeeded();
+      // Even if already primed, ensure music is playing (e.g. autoplay was blocked earlier)
+      if (!muted) {
+        const el = getMusicEl();
+        if (el && el.paused) {
+          el.muted = false;
+          const p = el.play();
+          if (p && p.catch) p.catch(() => {});
+          fadeMusicTo(MUSIC_VOLUME, 1500);
+        }
+      }
       return;
     }
     ensureCtx();
@@ -2844,6 +2887,8 @@ const GeeksAudio = (() => {
     } catch (e) {}
     resumeIfNeeded();
     _primed = true;
+    // First gesture also starts music (in case autoplay was blocked)
+    startAmbient();
   }
 
   // ---------- BACKGROUND MUSIC — looped Medieval Fantasy track ----------
@@ -2881,18 +2926,31 @@ const GeeksAudio = (() => {
     ensureCtx();
     if (ambientStarted) return;
     resumeIfNeeded();
-    ambientStarted = true;
 
     const el = getMusicEl();
     if (!el) return;
-    if (muted) return; // start silent — DEMP toggle will start it later
+    if (muted) {
+      // Keep playing muted so the video element is "warm" — DEMP toggle will unmute
+      el.muted = true;
+      const pm = el.play();
+      if (pm && pm.catch) pm.catch(() => {});
+      ambientStarted = true;
+      return;
+    }
 
-    // play() returns a promise (autoplay policy). Catch silently if blocked.
+    // Unmute and play. Browsers allow muted autoplay; unmuted needs a gesture.
+    el.muted = false;
     const playPromise = el.play();
     if (playPromise && playPromise.catch) {
-      playPromise.catch(() => { /* will start on next user gesture */ });
+      playPromise.catch(() => {
+        // Autoplay blocked — leave muted, play silently. prime() will retry on first gesture.
+        el.muted = true;
+        const retry = el.play();
+        if (retry && retry.catch) retry.catch(() => {});
+      });
     }
     fadeMusicTo(MUSIC_VOLUME, 4000);
+    ambientStarted = true;
   }
 
   function setMuted(v) {
@@ -2904,12 +2962,15 @@ const GeeksAudio = (() => {
       master.gain.setValueAtTime(master.gain.value, now);
       master.gain.linearRampToValueAtTime(muted ? 0 : 1, now + 0.18);
     }
-    // Background music: fade out on mute, fade in (or start) on unmute
+    // Background music: fade out + mute on demp; fade in + unmute on play
     const el = getMusicEl();
     if (el) {
       if (muted) {
         fadeMusicTo(0, 600);
+        // Keep element playing but muted — don't pause, so iOS audio session stays warm
+        el.muted = true;
       } else {
+        el.muted = false;
         if (el.paused) {
           const p = el.play();
           if (p && p.catch) p.catch(() => {});
@@ -2995,7 +3056,11 @@ const GeeksAudio = (() => {
   };
 })();
 
-// iOS-friendly priming: first pointerdown anywhere unlocks audio
+// Try to start music immediately on page load (may be blocked by autoplay policy;
+// the prime() handler below will retry on the first user gesture).
+GeeksAudio.startAmbient();
+
+// iOS-friendly priming: first pointerdown anywhere unlocks audio + (re)tries music
 ['pointerdown', 'touchstart', 'click'].forEach(evt => {
   document.addEventListener(evt, () => GeeksAudio.prime(), { once: true, capture: true, passive: true });
 });
@@ -4187,6 +4252,13 @@ window.addEventListener('keydown', (e) => {
 // =====================================================================
 function enterMediaHub() {
   if (currentScene === 'media') return;
+  // 0. Warp tunnel + sound feedback (same as warping to a planet)
+  const tunnel = document.getElementById('warp-tunnel');
+  if (tunnel) tunnel.classList.add('active');
+  GeeksAudio.playWarp();
+  // hide tunnel a bit after the scene swap completes
+  setTimeout(() => { if (tunnel) tunnel.classList.remove('active'); }, 1500);
+
   // 1. zoom-in toward MEDIA planet first
   const u = document.querySelector('.universe');
   const mediaPlanet = document.querySelector('.planet[data-id="media"]');
