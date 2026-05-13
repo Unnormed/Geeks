@@ -3057,14 +3057,18 @@ const GeeksAudio = (() => {
   };
 })();
 
-// Try to start music immediately on page load (may be blocked by autoplay policy;
-// the prime() handler below will retry on the first user gesture).
+// Try to start music immediately on page load — autoplay muted is allowed, unmuting
+// requires *any* form of user activation. We listen for the widest possible set of
+// gestures so the music unmutes the moment the user moves the mouse, scrolls,
+// touches, or hits a key — not just on a click.
 GeeksAudio.startAmbient();
 
-// iOS-friendly priming: first pointerdown anywhere unlocks audio + (re)tries music
-['pointerdown', 'touchstart', 'click'].forEach(evt => {
-  document.addEventListener(evt, () => GeeksAudio.prime(), { once: true, capture: true, passive: true });
+const _primeOnce = () => GeeksAudio.prime();
+['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click',
+ 'keydown', 'mousemove', 'mousedown', 'wheel', 'scroll'].forEach(evt => {
+  document.addEventListener(evt, _primeOnce, { once: true, capture: true, passive: true });
 });
+window.addEventListener('scroll', _primeOnce, { once: true, capture: true, passive: true });
 
 // Wire the Damp button
 document.addEventListener('DOMContentLoaded', GeeksAudio.updateToggleUI);
