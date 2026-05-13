@@ -2572,7 +2572,7 @@
 <!-- Background music: Medieval Fantasy ambient (looped)
      Using <video> instead of <audio> because iOS Safari respects the silent-switch
      for <audio> elements but plays <video> audio regardless. -->
-<video id="bg-music" src="assets/ambient.mp4" loop preload="auto" autoplay muted playsinline webkit-playsinline x5-playsinline disablepictureinpicture></video>
+<video id="bg-music" src="assets/ambient.mp4" loop preload="auto" playsinline webkit-playsinline x5-playsinline disablepictureinpicture></video>
 
 <!-- Always-visible sound toggle (top-center) -->
 <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Geluid dempen of aanzetten">
@@ -2931,26 +2931,27 @@ const GeeksAudio = (() => {
     const el = getMusicEl();
     if (!el) return;
     if (muted) {
-      // Keep playing muted so the video element is "warm" — DEMP toggle will unmute
-      el.muted = true;
-      const pm = el.play();
-      if (pm && pm.catch) pm.catch(() => {});
+      // User has explicitly muted via DEMP — don't auto-start
       ambientStarted = true;
       return;
     }
 
-    // Unmute and play. Browsers allow muted autoplay; unmuted needs a gesture.
+    // Try UNMUTED play first. Browsers like Chrome (with sufficient Media Engagement
+    // Index for this domain) allow this without a gesture — that's what made desktop
+    // work on previous visits. If it's blocked, fall back to muted autoplay and let
+    // the first user gesture unmute it.
     el.muted = false;
+    el.volume = MUSIC_VOLUME;
     const playPromise = el.play();
     if (playPromise && playPromise.catch) {
       playPromise.catch(() => {
-        // Autoplay blocked — leave muted, play silently. prime() will retry on first gesture.
+        // Unmuted blocked → play muted (always allowed for <video playsinline>)
         el.muted = true;
+        el.volume = MUSIC_VOLUME;
         const retry = el.play();
         if (retry && retry.catch) retry.catch(() => {});
       });
     }
-    fadeMusicTo(MUSIC_VOLUME, 4000);
     ambientStarted = true;
   }
 
