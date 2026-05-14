@@ -1110,14 +1110,11 @@
 
   .host-portrait img {
     position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    inset: 0;
+    width: 100%;
     height: 100%;
-    width: auto;
-    max-width: none;
-    object-fit: contain;
-    object-position: bottom center;
+    object-fit: cover;
+    object-position: center top;
     z-index: 1;
     display: block;
   }
@@ -1125,14 +1122,11 @@
      Clip BELOW the line via inset-bottom, so the alt grows from top to bottom as scan-y → 1 */
   .host-portrait-alt {
     position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    inset: 0;
+    width: 100%;
     height: 100%;
-    width: auto;
-    max-width: none;
-    object-fit: contain;
-    object-position: bottom center;
+    object-fit: cover;
+    object-position: center top;
     z-index: 2;
     pointer-events: none;
     display: block;
@@ -1248,7 +1242,7 @@
   }
   .host-pick:hover::before { opacity: 0.75; }
   .host-pick:hover .host-pick-img {
-    transform: translate(-50%, 0) scale(1.04);
+    transform: scale(1.04);
   }
   .host-pick-bg {
     position: absolute;
@@ -1260,16 +1254,15 @@
   }
   .host-pick-img {
     position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translate(-50%, 0);
-    height: 92%;
-    width: auto;
-    object-fit: contain;
-    object-position: bottom center;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
     z-index: 2;
-    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
     pointer-events: none;
+    transform-origin: center bottom;
   }
   .host-pick-info {
     position: absolute;
