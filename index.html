@@ -1121,7 +1121,8 @@
     z-index: 1;
     display: block;
   }
-  /* Alt portrait — revealed below the scan line (transformation effect) */
+  /* Alt portrait — revealed ABOVE the scan line as it sweeps down (transformation effect)
+     Clip BELOW the line via inset-bottom, so the alt grows from top to bottom as scan-y → 1 */
   .host-portrait-alt {
     position: absolute;
     bottom: 0;
@@ -1135,41 +1136,29 @@
     z-index: 2;
     pointer-events: none;
     display: block;
-    /* Reveal everything BELOW the scan line; clip everything above */
-    clip-path: inset(clamp(0%, calc(var(--scan-y, 0) * 100%), 100%) 0 0 0);
-    -webkit-clip-path: inset(clamp(0%, calc(var(--scan-y, 0) * 100%), 100%) 0 0 0);
-  }
-  @property --scan-y {
-    syntax: '<number>';
-    initial-value: -0.05;
-    inherits: false;
+    clip-path: inset(0 0 clamp(0%, calc((1 - var(--scan-y, 0)) * 100%), 100%) 0);
+    -webkit-clip-path: inset(0 0 clamp(0%, calc((1 - var(--scan-y, 0)) * 100%), 100%) 0);
+    /* Optional: slight glitch tint as it reveals */
+    filter: saturate(1.05);
   }
   .host-portrait .scan {
     position: absolute;
     left: -8%;
     right: -8%;
     height: 22px;
-    top: calc(var(--scan-y, 0) * 100% - 11px);
+    top: calc(var(--scan-y, 0) * 100%);
+    margin-top: -11px;
     background: linear-gradient(180deg, transparent 0%, var(--planet-color) 50%, transparent 100%);
-    opacity: 0.85;
+    opacity: 0.9;
     box-shadow: 0 0 18px var(--planet-color), 0 0 32px var(--planet-color);
     pointer-events: none;
     z-index: 4;
     mix-blend-mode: screen;
-  }
-  .host-portrait {
-    animation: portrait-scan 5s ease-in-out infinite;
-  }
-  @keyframes portrait-scan {
-    0%, 100% { --scan-y: -0.05; }
-    50%      { --scan-y: 1.05; }
-  }
-  /* When the user is actively swiping, JS drives --scan-y inline */
-  .host-portrait.scan-interactive {
-    animation: none;
+    will-change: top;
   }
   .host-portrait.has-alt {
     cursor: ns-resize;
+    touch-action: none;
   }
   .host-portrait.has-alt::after {
     content: "// SWIPE";
@@ -1182,7 +1171,7 @@
     letter-spacing: 0.3em;
     color: var(--planet-color);
     opacity: 0.55;
-    z-index: 4;
+    z-index: 5;
     pointer-events: none;
     text-shadow: 0 0 6px rgba(0,0,0,0.8);
     animation: hint-blink 2.4s ease-in-out infinite;
@@ -3349,6 +3338,7 @@ const HOSTS = [
     desc: 'Dual Mode Caster. Gelaagd, schijnbaar simpele vragen die diep snijden.',
     color: '#25e0ff', glow: 'rgba(37,224,255,0.6)',
     img: 'assets/issam-full.jpg',
+    altImg: 'assets/issam-alt.jpg',
     class: 'Dual Mode Caster',
     tag: 'Vraagt het simpele. Snijdt het diep.',
     stats: [
@@ -3375,6 +3365,7 @@ const HOSTS = [
     desc: 'Chaos Rogue. Hot takes, headshot accuracy, "skip first, ask never".',
     color: '#ff4060', glow: 'rgba(255,64,96,0.6)',
     img: 'assets/joenes-full.jpg',
+    altImg: 'assets/joenes-alt.jpg',
     class: 'Chaos Rogue',
     tag: 'Headshot first. Cutscene never.',
     stats: [
@@ -3870,60 +3861,73 @@ function openHostView(hostId) {
     document.getElementById('planet-view').scrollTo(0, 0);
   });
   inner.querySelectorAll('.btn-disconnect-galaxy').forEach(b => b.addEventListener('click', closePlanetView));
-  // Wire up swipe interaction on portraits that have a transformation alt image
-  inner.querySelectorAll('.host-portrait.has-alt').forEach(setupAltSwipe);
+  // Wire up the scan-line loop on every portrait (interactive swipe on has-alt ones)
+  inner.querySelectorAll('.host-portrait').forEach(setupPortraitScan);
   view.classList.add('opening');
   setTimeout(() => view.classList.remove('opening'), 600);
   view.scrollTo(0, 0);
 }
 
-// Interactive scan-line swipe: drag/swipe over the portrait to reveal the alt image
-function setupAltSwipe(portrait) {
-  let resumeTimer = null;
-  const RESUME_DELAY = 1200;
+// JS-driven scan line on host portraits. Each portrait gets its own rAF loop that
+// updates --scan-y; .has-alt portraits also expose a swipe/hover interaction that
+// scrubs the line by pointer Y position.
+function setupPortraitScan(portrait) {
+  const MIN = -0.05, MAX = 1.05;
+  const SPEED = 1 / 2400;       // ~2.4s for a full top-to-bottom sweep
+  const RESUME_DELAY = 1000;    // ms of inactivity before auto-loop resumes
+  const hasAlt = portrait.classList.contains('has-alt');
 
+  let scanY = MIN;
+  let dir = 1;
+  let lastT = performance.now();
+  let interactiveValue = scanY;
+  let interactiveUntil = 0;
+  let raf = 0;
+
+  function tick(now) {
+    const dt = Math.min(50, now - lastT);
+    lastT = now;
+    if (now < interactiveUntil) {
+      // Ease towards the user's pointer position for smooth scrubbing
+      scanY += (interactiveValue - scanY) * 0.45;
+    } else {
+      scanY += dir * SPEED * dt;
+      if (scanY >= MAX) { scanY = MAX; dir = -1; }
+      if (scanY <= MIN) { scanY = MIN; dir = 1; }
+    }
+    portrait.style.setProperty('--scan-y', scanY.toFixed(4));
+    raf = requestAnimationFrame(tick);
+  }
+  raf = requestAnimationFrame(tick);
+
+  if (!hasAlt) return;
+
+  // Interactive scrub: pointer drag on touch, pointer hover/drag on desktop
   function setFromY(clientY) {
     const rect = portrait.getBoundingClientRect();
-    const raw = (clientY - rect.top) / rect.height;
-    const clamped = Math.max(-0.05, Math.min(1.05, raw));
-    portrait.classList.add('scan-interactive');
-    portrait.style.setProperty('--scan-y', clamped.toFixed(4));
-    if (resumeTimer) clearTimeout(resumeTimer);
-    resumeTimer = setTimeout(() => {
-      portrait.classList.remove('scan-interactive');
-      portrait.style.removeProperty('--scan-y');
-      resumeTimer = null;
-    }, RESUME_DELAY);
+    const y = (clientY - rect.top) / rect.height;
+    interactiveValue = Math.max(MIN, Math.min(MAX, y));
+    interactiveUntil = performance.now() + RESUME_DELAY;
   }
-
-  // Pointer move (handles mouse + touch + pen). Only "press and drag" for mobile,
-  // but desktop hover should also work — so we listen for plain mousemove too.
   let pressing = false;
   portrait.addEventListener('pointerdown', (e) => {
     pressing = true;
-    portrait.setPointerCapture?.(e.pointerId);
+    try { portrait.setPointerCapture(e.pointerId); } catch (_) {}
     setFromY(e.clientY);
+    e.preventDefault();
   });
   portrait.addEventListener('pointerup', (e) => {
     pressing = false;
-    portrait.releasePointerCapture?.(e.pointerId);
+    try { portrait.releasePointerCapture(e.pointerId); } catch (_) {}
   });
   portrait.addEventListener('pointercancel', () => { pressing = false; });
-
   portrait.addEventListener('pointermove', (e) => {
-    // Desktop: any hover-move scrubs. Mobile: only while pressing (touch).
     if (e.pointerType === 'touch' && !pressing) return;
     setFromY(e.clientY);
   });
-
-  // Mouse-leave on desktop quickly returns control to the auto-animation
   portrait.addEventListener('pointerleave', () => {
-    if (resumeTimer) clearTimeout(resumeTimer);
-    resumeTimer = setTimeout(() => {
-      portrait.classList.remove('scan-interactive');
-      portrait.style.removeProperty('--scan-y');
-      resumeTimer = null;
-    }, 400);
+    // Let the auto-loop pick up sooner once the cursor leaves
+    interactiveUntil = Math.min(interactiveUntil, performance.now() + 250);
   });
 }
 
