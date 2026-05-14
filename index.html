@@ -1121,18 +1121,75 @@
     z-index: 1;
     display: block;
   }
+  /* Alt portrait — revealed below the scan line (transformation effect) */
+  .host-portrait-alt {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    width: auto;
+    max-width: none;
+    object-fit: contain;
+    object-position: bottom center;
+    z-index: 2;
+    pointer-events: none;
+    display: block;
+    /* Reveal everything BELOW the scan line; clip everything above */
+    clip-path: inset(clamp(0%, calc(var(--scan-y, 0) * 100%), 100%) 0 0 0);
+    -webkit-clip-path: inset(clamp(0%, calc(var(--scan-y, 0) * 100%), 100%) 0 0 0);
+  }
+  @property --scan-y {
+    syntax: '<number>';
+    initial-value: -0.05;
+    inherits: false;
+  }
   .host-portrait .scan {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 0%, transparent 49%, var(--planet-color) 50%, transparent 51%, transparent 100%);
-    opacity: 0.4;
-    animation: scan 4s linear infinite;
+    left: -8%;
+    right: -8%;
+    height: 22px;
+    top: calc(var(--scan-y, 0) * 100% - 11px);
+    background: linear-gradient(180deg, transparent 0%, var(--planet-color) 50%, transparent 100%);
+    opacity: 0.85;
+    box-shadow: 0 0 18px var(--planet-color), 0 0 32px var(--planet-color);
     pointer-events: none;
-    z-index: 2;
+    z-index: 4;
+    mix-blend-mode: screen;
   }
-  @keyframes scan {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(100%); }
+  .host-portrait {
+    animation: portrait-scan 5s ease-in-out infinite;
+  }
+  @keyframes portrait-scan {
+    0%, 100% { --scan-y: -0.05; }
+    50%      { --scan-y: 1.05; }
+  }
+  /* When the user is actively swiping, JS drives --scan-y inline */
+  .host-portrait.scan-interactive {
+    animation: none;
+  }
+  .host-portrait.has-alt {
+    cursor: ns-resize;
+  }
+  .host-portrait.has-alt::after {
+    content: "// SWIPE";
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--f-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--planet-color);
+    opacity: 0.55;
+    z-index: 4;
+    pointer-events: none;
+    text-shadow: 0 0 6px rgba(0,0,0,0.8);
+    animation: hint-blink 2.4s ease-in-out infinite;
+  }
+  @keyframes hint-blink {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 0.8; }
   }
   .host-portrait .badges {
     position: absolute;
@@ -3265,6 +3322,7 @@ const HOSTS = [
     desc: 'Story-Driven Strategist. Emotionele speler, lore-discipline. Hub van complexe vrouwelijke protagonisten.',
     color: '#7B2CFF', glow: 'rgba(123,44,255,0.6)',
     img: 'assets/hamza-full.jpg',
+    altImg: 'assets/hamza-alt.jpg',
     class: 'Story-Driven Strategist',
     tag: 'Speelt elk verhaal alsof het echt is.',
     stats: [
@@ -3812,9 +3870,61 @@ function openHostView(hostId) {
     document.getElementById('planet-view').scrollTo(0, 0);
   });
   inner.querySelectorAll('.btn-disconnect-galaxy').forEach(b => b.addEventListener('click', closePlanetView));
+  // Wire up swipe interaction on portraits that have a transformation alt image
+  inner.querySelectorAll('.host-portrait.has-alt').forEach(setupAltSwipe);
   view.classList.add('opening');
   setTimeout(() => view.classList.remove('opening'), 600);
   view.scrollTo(0, 0);
+}
+
+// Interactive scan-line swipe: drag/swipe over the portrait to reveal the alt image
+function setupAltSwipe(portrait) {
+  let resumeTimer = null;
+  const RESUME_DELAY = 1200;
+
+  function setFromY(clientY) {
+    const rect = portrait.getBoundingClientRect();
+    const raw = (clientY - rect.top) / rect.height;
+    const clamped = Math.max(-0.05, Math.min(1.05, raw));
+    portrait.classList.add('scan-interactive');
+    portrait.style.setProperty('--scan-y', clamped.toFixed(4));
+    if (resumeTimer) clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      portrait.classList.remove('scan-interactive');
+      portrait.style.removeProperty('--scan-y');
+      resumeTimer = null;
+    }, RESUME_DELAY);
+  }
+
+  // Pointer move (handles mouse + touch + pen). Only "press and drag" for mobile,
+  // but desktop hover should also work — so we listen for plain mousemove too.
+  let pressing = false;
+  portrait.addEventListener('pointerdown', (e) => {
+    pressing = true;
+    portrait.setPointerCapture?.(e.pointerId);
+    setFromY(e.clientY);
+  });
+  portrait.addEventListener('pointerup', (e) => {
+    pressing = false;
+    portrait.releasePointerCapture?.(e.pointerId);
+  });
+  portrait.addEventListener('pointercancel', () => { pressing = false; });
+
+  portrait.addEventListener('pointermove', (e) => {
+    // Desktop: any hover-move scrubs. Mobile: only while pressing (touch).
+    if (e.pointerType === 'touch' && !pressing) return;
+    setFromY(e.clientY);
+  });
+
+  // Mouse-leave on desktop quickly returns control to the auto-animation
+  portrait.addEventListener('pointerleave', () => {
+    if (resumeTimer) clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      portrait.classList.remove('scan-interactive');
+      portrait.style.removeProperty('--scan-y');
+      resumeTimer = null;
+    }, 400);
+  });
 }
 
 function buildHostFullHTML(p) {
@@ -3848,12 +3958,13 @@ function buildHostFullHTML(p) {
     </div>
 
     <div class="host-hero">
-      <div class="host-portrait">
+      <div class="host-portrait${p.altImg ? ' has-alt' : ''}" data-host="${p.id}">
         <span class="corner tl"></span>
         <span class="corner tr"></span>
         <span class="corner bl"></span>
         <span class="corner br"></span>
         <img src="${p.img}" alt="${p.short}">
+        ${p.altImg ? `<img src="${p.altImg}" class="host-portrait-alt" alt="" aria-hidden="true">` : ''}
         <div class="scan"></div>
         <div class="badges">
           <div class="host-badge">LV. 99</div>
